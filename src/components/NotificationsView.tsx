@@ -19,9 +19,11 @@ import {
 import { AppNotification } from '../types';
 
 export const NotificationsView: React.FC = () => {
-  const { notifications, vaults, markNotificationAsRead, language, addLog } = useApp();
+  const { notifications, vaults, markNotificationAsRead, language, addLog, resolveFilePayload, settings } = useApp();
   const [selectedNotif, setSelectedNotif] = useState<AppNotification | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadingType, setDownloadingType] = useState<'armored' | 'viewq' | null>(null);
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
@@ -41,18 +43,29 @@ export const NotificationsView: React.FC = () => {
   // Find corresponding vault to enable downloads if available in cloud
   const matchedVault = selectedNotif ? vaults.find(v => v.id === selectedNotif.vaultId) : null;
   
-  const isArmoredAvailable = matchedVault?.armoredFileBase64 && !matchedVault.armoredFileBase64.startsWith('local_only:');
-  const isViewQAvailable = matchedVault?.viewQFileBase64 && !matchedVault.viewQFileBase64.startsWith('local_only:');
+  const isArmoredAvailable = !!matchedVault?.armoredFileBase64;
+  const isViewQAvailable = !!matchedVault?.viewQFileBase64;
   const isLocalOnly = matchedVault?.viewQFileBase64?.startsWith('local_only:') || matchedVault?.armoredFileBase64?.startsWith('local_only:');
 
-  const downloadFile = (base64Data: string, filename: string) => {
-    const link = document.createElement('a');
-    link.href = base64Data;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addLog('SUCCESS', `Evidencia descargada localmente desde notificación: ${filename}`);
+  const downloadFile = async (base64Data: string, filename: string, vaultId: string, type: 'armored' | 'viewq') => {
+    setIsDownloading(true);
+    setDownloadingType(type);
+    try {
+      const resolvedDataUrl = await resolveFilePayload(base64Data, vaultId, type);
+      const link = document.createElement('a');
+      link.href = resolvedDataUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      addLog('SUCCESS', `Evidencia descargada localmente desde notificación: ${filename}`);
+    } catch (err) {
+      console.error(err);
+      alert(language === 'es' ? 'Error al descargar' : 'Error downloading');
+    } finally {
+      setIsDownloading(false);
+      setDownloadingType(null);
+    }
   };
 
   return (
@@ -303,7 +316,7 @@ export const NotificationsView: React.FC = () => {
                             {selectedNotif.stellarTxHash}
                           </span>
                           <a
-                            href={`https://stellar.expert/explorer/testnet/tx/${selectedNotif.stellarTxHash}`}
+                            href={`https://stellar.expert/explorer/${(matchedVault?.manifest?.stellarNotarization?.network || settings.stellarNetwork) === 'public' ? 'public' : 'testnet'}/tx/${selectedNotif.stellarTxHash}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-800 p-0.5 transition-colors"
@@ -347,12 +360,17 @@ export const NotificationsView: React.FC = () => {
                               : '.txt';
                             const origName = matchedVault.manifest.payload.originalFilename || 'evidencia';
                             const baseName = origName.includes('.') ? origName.substring(0, origName.lastIndexOf('.')) : origName;
-                            downloadFile(matchedVault.viewQFileBase64!, `${baseName}.viewQ`);
+                            downloadFile(matchedVault.viewQFileBase64!, `${baseName}.viewQ`, matchedVault.id, 'viewq');
                           }}
-                          className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-sans text-xs font-bold uppercase tracking-wider px-4 py-3 rounded-sm transition-colors cursor-pointer"
+                          disabled={isDownloading}
+                          className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-sans text-xs font-bold uppercase tracking-wider px-4 py-3 rounded-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Lock size={12} />
-                          <span>{language === 'es' ? 'Descargar .viewQ' : 'Download .viewQ'}</span>
+                          <Lock size={12} className={isDownloading && downloadingType === 'viewq' ? 'animate-spin' : ''} />
+                          <span>
+                            {isDownloading && downloadingType === 'viewq'
+                              ? (language === 'es' ? 'Descargando...' : 'Downloading...')
+                              : (language === 'es' ? 'Descargar .viewQ' : 'Download .viewQ')}
+                          </span>
                         </button>
                       )}
 
@@ -360,12 +378,17 @@ export const NotificationsView: React.FC = () => {
                         <button
                           onClick={() => {
                             const name = matchedVault.manifest.payload.originalFilename || 'evidencia_blindada.txt';
-                            downloadFile(matchedVault.armoredFileBase64!, `blindado_${name}`);
+                            downloadFile(matchedVault.armoredFileBase64!, `blindado_${name}`, matchedVault.id, 'armored');
                           }}
-                          className="flex items-center justify-center gap-1.5 bg-black hover:bg-gray-800 text-white font-sans text-xs font-bold uppercase tracking-wider px-4 py-3 rounded-sm transition-colors cursor-pointer"
+                          disabled={isDownloading}
+                          className="flex items-center justify-center gap-1.5 bg-black hover:bg-gray-800 text-white font-sans text-xs font-bold uppercase tracking-wider px-4 py-3 rounded-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Download size={12} />
-                          <span>{language === 'es' ? 'Descargar Blindado' : 'Download Armored'}</span>
+                          <Download size={12} className={isDownloading && downloadingType === 'armored' ? 'animate-spin' : ''} />
+                          <span>
+                            {isDownloading && downloadingType === 'armored'
+                              ? (language === 'es' ? 'Descargando...' : 'Downloading...')
+                              : (language === 'es' ? 'Descargar Blindado' : 'Download Armored')}
+                          </span>
                         </button>
                       )}
 

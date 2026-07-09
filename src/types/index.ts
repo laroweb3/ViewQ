@@ -6,6 +6,9 @@ export interface AppSettings {
   apiProxyBaseUrl: string;
   stellarSourceSecret: string;
   stellarNetwork: 'testnet' | 'public';
+  pinataJwt?: string;
+  pinataGateway?: string;
+  usePinata?: boolean;
 }
 
 export interface TerminalLog {

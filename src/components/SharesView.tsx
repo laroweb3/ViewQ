@@ -16,7 +16,7 @@ const sha3_256 = (
 );
 
 export const SharesView: React.FC = () => {
-  const { ephemeralShares, addEphemeralShare, updateEphemeralShare, deleteEphemeralShare, addLog, settings, language } = useApp();
+  const { ephemeralShares, addEphemeralShare, updateEphemeralShare, deleteEphemeralShare, addLog, settings, language, resolveSharePayload } = useApp();
   const t = translations[language];
   const [filename, setFilename] = useState('');
   const [plainText, setPlainText] = useState('');
@@ -221,14 +221,68 @@ export const SharesView: React.FC = () => {
     setSimulationStep('decrypting');
     log("Extrayendo clave AES del fragmento de la URL (Zero-Knowledge Server)...");
     await new Promise(r => setTimeout(r, 800));
+
+    let encryptedData = share.encryptedData;
+    if (encryptedData.startsWith('chunked:')) {
+      log("Descargando fragmentos de evidencia distribuidos en la nube...");
+      try {
+        encryptedData = await resolveSharePayload(encryptedData, share.token);
+        log(`Fragmentos consolidados correctamente (${(encryptedData.length / 1024).toFixed(2)} KB).`);
+      } catch (e: any) {
+        log(`Error al descargar fragmentos: ${e.message || e}`);
+        setSimulationStep('error');
+        return;
+      }
+    }
+
     log("Descifrando datos confidenciales con AES-GCM-256 en memoria local...");
     await new Promise(r => setTimeout(r, 600));
 
     let decrypted = '';
     try {
-      decrypted = decodeURIComponent(atob(share.encryptedData)).replace(` [INTEGRITY_CHECK_OK:${share.token}]`, '');
+      // Intelligently detect if encryptedData is a real AES-GCM Hex payload
+      const isHex = /^[0-9a-fA-F]+$/.test(encryptedData);
+      if (isHex && share.aesKeyHex && share.iv) {
+        const hexToBytes = (hex: string): Uint8Array => {
+          const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
+          const sanitized = cleanHex.trim().replace(/[^0-9a-fA-F]/g, '');
+          const bytes = new Uint8Array(sanitized.length / 2);
+          for (let i = 0; i < bytes.length; i++) {
+            bytes[i] = parseInt(sanitized.slice(i * 2, i * 2 + 2), 16);
+          }
+          return bytes;
+        };
+
+        const rawKeyBytes = hexToBytes(share.aesKeyHex);
+        const cryptoKey = await window.crypto.subtle.importKey(
+          'raw',
+          rawKeyBytes,
+          { name: 'AES-GCM' },
+          false,
+          ['decrypt']
+        );
+        const ivBytes = hexToBytes(share.iv);
+        const encryptedBytes = hexToBytes(encryptedData);
+        
+        const decryptedBuffer = await window.crypto.subtle.decrypt(
+          {
+            name: 'AES-GCM',
+            iv: ivBytes,
+          },
+          cryptoKey,
+          encryptedBytes
+        );
+        decrypted = new TextDecoder().decode(decryptedBuffer);
+      } else {
+        decrypted = decodeURIComponent(atob(encryptedData)).replace(` [INTEGRITY_CHECK_OK:${share.token}]`, '');
+      }
     } catch (err) {
-      decrypted = "Error de descifrado";
+      console.error('Failed to decrypt, trying fallback', err);
+      try {
+        decrypted = decodeURIComponent(atob(encryptedData)).replace(` [INTEGRITY_CHECK_OK:${share.token}]`, '');
+      } catch (e) {
+        decrypted = language === 'es' ? "Error de descifrado o datos corruptos" : "Decryption error or corrupted data";
+      }
     }
 
     setDecryptedFileContent(decrypted);

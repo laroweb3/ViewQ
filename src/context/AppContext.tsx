@@ -36,6 +36,8 @@ export interface FirestoreErrorInfo {
   }
 }
 
+export let onFirestoreErrorCallback: ((error: any) => void) | null = null;
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -43,8 +45,27 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.warn('Firestore Error (handled gracefully): ', JSON.stringify(errInfo));
+  if (onFirestoreErrorCallback) {
+    onFirestoreErrorCallback(error);
+  }
+}
+
+export function stripUndefined(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(stripUndefined);
+  }
+  const cleaned: any = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (val !== undefined) {
+      cleaned[key] = stripUndefined(val);
+    }
+  }
+  return cleaned;
 }
 
 interface AppContextType {
@@ -85,6 +106,12 @@ interface AppContextType {
   // Notifications
   notifications: AppNotification[];
   markNotificationAsRead: (id: string) => void;
+  resolveFilePayload: (payloadString: string, vaultId: string, type: 'armored' | 'viewq') => Promise<string>;
+  resolveSharePayload: (encryptedData: string, token: string) => Promise<string>;
+
+  // Firestore Status (for handling Quota limits or connection drops gracefully)
+  firestoreStatus: 'online' | 'offline' | 'quota-exceeded';
+  setFirestoreStatus: (status: 'online' | 'offline' | 'quota-exceeded') => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -95,6 +122,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   apiProxyBaseUrl: 'https://api.ionq.co/v0.3',
   stellarSourceSecret: '',
   stellarNetwork: 'testnet',
+  pinataJwt: '',
+  pinataGateway: 'gateway.pinata.cloud',
+  usePinata: false,
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -186,9 +216,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 5. Initialize active states
   const [logs, setLogs] = useState<TerminalLog[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    const saved = localStorage.getItem('quantum_pqc_notifications');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify' | 'wiki' | 'users' | 'notifications'>('transmission');
+  const [firestoreStatus, setFirestoreStatus] = useState<'online' | 'offline' | 'quota-exceeded'>('online');
+
+  // Register the global Firestore error callback to map database failures to user-friendly states
+  useEffect(() => {
+    onFirestoreErrorCallback = (err: any) => {
+      const msg = String(err?.message || err);
+      const code = String(err?.code || '');
+      if (
+        code.includes('resource-exhausted') || 
+        msg.includes('quota') || 
+        msg.includes('resource-exhausted') || 
+        msg.includes('Quota')
+      ) {
+        setFirestoreStatus('quota-exceeded');
+      } else if (
+        code.includes('unavailable') || 
+        msg.includes('unavailable') || 
+        msg.includes('offline') || 
+        msg.includes('Could not reach')
+      ) {
+        setFirestoreStatus('offline');
+      }
+    };
+    return () => {
+      onFirestoreErrorCallback = null;
+    };
+  }, []);
+
+  // Automatically save state changes to localStorage as a robust local-first backup
+  useEffect(() => {
+    localStorage.setItem('quantum_pqc_vaults', JSON.stringify(vaults));
+  }, [vaults]);
+
+  useEffect(() => {
+    localStorage.setItem('quantum_pqc_shares', JSON.stringify(ephemeralShares));
+  }, [ephemeralShares]);
+
+  useEffect(() => {
+    localStorage.setItem('quantum_pqc_registered_users', JSON.stringify(registeredUsers));
+  }, [registeredUsers]);
+
+  useEffect(() => {
+    localStorage.setItem('quantum_pqc_notifications', JSON.stringify(notifications));
+  }, [notifications]);
 
   // Initialize language from localStorage (defaults to 'es')
   const [language, setLanguageState] = useState<'es' | 'en'>(() => {
@@ -201,7 +285,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('quantum_pqc_language', lang);
   };
 
-  // Real-time Firestore Listeners
+  // Real-time Firestore Listeners with Local-First Fail-safe Merges
 
   // 1. Listen to vaults collection
   useEffect(() => {
@@ -227,8 +311,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         list.push(data);
       });
-      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      setVaults(list);
+
+      // Merge with localStorage vaults to avoid losing local-only seals (e.g. created during quota exhaust)
+      const savedRaw = localStorage.getItem('quantum_pqc_vaults');
+      let localList: VaultRecord[] = [];
+      if (savedRaw) {
+        try { localList = JSON.parse(savedRaw); } catch (e) {}
+      }
+
+      const mergedList = [...list];
+      const cloudIds = new Set(list.map(item => item.id));
+      for (const item of localList) {
+        if (!cloudIds.has(item.id)) {
+          mergedList.push(item);
+        }
+      }
+
+      mergedList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setVaults(mergedList);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'vaults');
     });
@@ -242,7 +342,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       snapshot.forEach((doc) => {
         list.push(doc.data() as EphemeralShare);
       });
-      setEphemeralShares(list);
+
+      const savedRaw = localStorage.getItem('quantum_pqc_shares');
+      let localList: EphemeralShare[] = [];
+      if (savedRaw) {
+        try { localList = JSON.parse(savedRaw); } catch (e) {}
+      }
+
+      const mergedList = [...list];
+      const cloudTokens = new Set(list.map(item => item.token));
+      for (const item of localList) {
+        if (!cloudTokens.has(item.token)) {
+          mergedList.push(item);
+        }
+      }
+
+      setEphemeralShares(mergedList);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'shares');
     });
@@ -257,8 +372,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         list.push(doc.data() as RegisteredUser);
       });
       
-      // If "laro" is missing in the database, insert it
-      const laroExists = list.some(u => u.username.toLowerCase() === 'laro');
+      const savedRaw = localStorage.getItem('quantum_pqc_registered_users');
+      let localList: RegisteredUser[] = [];
+      if (savedRaw) {
+        try { localList = JSON.parse(savedRaw); } catch (e) {}
+      }
+
+      const mergedList = [...list];
+      const cloudUsernames = new Set(list.map(item => item.username.toLowerCase()));
+      for (const item of localList) {
+        if (!cloudUsernames.has(item.username.toLowerCase())) {
+          mergedList.push(item);
+        }
+      }
+
+      // If "laro" is missing in the database/list, insert it
+      const laroExists = mergedList.some(u => u.username.toLowerCase() === 'laro');
       if (!laroExists) {
         const defaultLaro: RegisteredUser = {
           username: 'Laro',
@@ -269,29 +398,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setDoc(doc(db, 'users', 'laro'), defaultLaro).catch((err) => {
           handleFirestoreError(err, OperationType.WRITE, 'users/laro');
         });
-        list.push(defaultLaro);
+        mergedList.push(defaultLaro);
       }
-      setRegisteredUsers(list);
+      setRegisteredUsers(mergedList);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'users');
     });
     return () => unsubscribe();
   }, []);
 
-  // 4. Listen to logs collection
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'logs'), (snapshot) => {
-      const list: TerminalLog[] = [];
-      snapshot.forEach((doc) => {
-        list.push(doc.data() as TerminalLog);
-      });
-      list.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-      setLogs(list);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'logs');
-    });
-    return () => unsubscribe();
-  }, []);
+  // 4. Logs are session-specific and local-only to prevent Firestore write queue exhaust and quota issues.
+  // We do not subscribe to or sync logs with the cloud database.
 
   // 4b. Listen to notifications collection
   useEffect(() => {
@@ -307,8 +424,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           list.push(notif);
         }
       });
-      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      setNotifications(list);
+
+      const savedRaw = localStorage.getItem('quantum_pqc_notifications');
+      let localList: AppNotification[] = [];
+      if (savedRaw) {
+        try { localList = JSON.parse(savedRaw); } catch (e) {}
+      }
+
+      const mergedList = [...list];
+      const cloudIds = new Set(list.map(item => item.id));
+      for (const item of localList) {
+        if (item.recipientUsername === user.username.toLowerCase() && !cloudIds.has(item.id)) {
+          mergedList.push(item);
+        }
+      }
+
+      mergedList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setNotifications(mergedList);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'notifications');
     });
@@ -336,6 +468,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsubscribe();
   }, [user?.username]);
 
+  // 6. Listen to global settings (saved by superadmin laro) in firestore
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'laro'), (docSnap) => {
+      if (docSnap.exists()) {
+        const cloudSettings = docSnap.data() as AppSettings;
+        setSettings(cloudSettings);
+        localStorage.setItem('quantum_pqc_settings', JSON.stringify(cloudSettings));
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'settings/laro');
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Keep user session in localStorage so they stay logged in on refresh
   useEffect(() => {
     if (user) {
@@ -355,7 +501,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addVault = (record: VaultRecord) => {
+  const addVault = async (record: VaultRecord) => {
+    // Add to local state immediately so it's usable instantly
+    setVaults(prev => {
+      if (prev.some(v => v.id === record.id)) return prev;
+      return [record, ...prev];
+    });
+
     // Clone the record to avoid mutating the live state directly
     const recordForCloud = { ...record };
     
@@ -367,7 +519,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch (e) {
           console.warn("localStorage quota exceeded for armored file:", e);
         }
-        recordForCloud.armoredFileBase64 = `local_only:${record.id}`;
+        
+        try {
+          const CHUNK_SIZE = 500000;
+          const content = record.armoredFileBase64;
+          const totalLength = content.length;
+          let index = 0;
+          const promises = [];
+          for (let i = 0; i < totalLength; i += CHUNK_SIZE) {
+            const chunk = content.substring(i, i + CHUNK_SIZE);
+            const chunkId = `chunk_${record.id}_armored_${index}`;
+            const chunkRef = doc(db, 'vault_chunks', chunkId);
+            promises.push(
+              setDoc(chunkRef, {
+                vaultId: record.id,
+                type: 'armored',
+                index,
+                content: chunk,
+                createdAt: new Date().toISOString()
+              })
+            );
+            index++;
+          }
+          await Promise.all(promises);
+          recordForCloud.armoredFileBase64 = `chunked:${record.id}:armored:${index}`;
+        } catch (err) {
+          console.error("Failed to save armored file to Firestore chunks, falling back to local_only:", err);
+          recordForCloud.armoredFileBase64 = `local_only:${record.id}`;
+        }
       }
     }
     
@@ -379,11 +558,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch (e) {
           console.warn("localStorage quota exceeded for viewQ file:", e);
         }
-        recordForCloud.viewQFileBase64 = `local_only:${record.id}`;
+        
+        try {
+          const CHUNK_SIZE = 500000;
+          const content = record.viewQFileBase64;
+          const totalLength = content.length;
+          let index = 0;
+          const promises = [];
+          for (let i = 0; i < totalLength; i += CHUNK_SIZE) {
+            const chunk = content.substring(i, i + CHUNK_SIZE);
+            const chunkId = `chunk_${record.id}_viewq_${index}`;
+            const chunkRef = doc(db, 'vault_chunks', chunkId);
+            promises.push(
+              setDoc(chunkRef, {
+                vaultId: record.id,
+                type: 'viewq',
+                index,
+                content: chunk,
+                createdAt: new Date().toISOString()
+              })
+            );
+            index++;
+          }
+          await Promise.all(promises);
+          recordForCloud.viewQFileBase64 = `chunked:${record.id}:viewq:${index}`;
+        } catch (err) {
+          console.error("Failed to save viewQ file to Firestore chunks, falling back to local_only:", err);
+          recordForCloud.viewQFileBase64 = `local_only:${record.id}`;
+        }
       }
     }
 
-    setDoc(doc(db, 'vaults', recordForCloud.id), recordForCloud).catch((err) => {
+    const cleanedRecordForCloud = stripUndefined(recordForCloud);
+
+    setDoc(doc(db, 'vaults', cleanedRecordForCloud.id), cleanedRecordForCloud).catch((err) => {
       handleFirestoreError(err, OperationType.WRITE, `vaults/${record.id}`);
     });
 
@@ -407,13 +615,101 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ledger: record.manifest.stellarNotarization?.ledger
       };
 
-      setDoc(doc(db, 'notifications', notifId), newNotif).catch((err) => {
+      const cleanedNotif = stripUndefined(newNotif);
+
+      // Add to local state immediately
+      setNotifications(prev => {
+        if (prev.some(n => n.id === notifId)) return prev;
+        return [newNotif, ...prev];
+      });
+
+      setDoc(doc(db, 'notifications', notifId), cleanedNotif).catch((err) => {
         handleFirestoreError(err, OperationType.WRITE, `notifications/${notifId}`);
       });
     }
   };
 
+  const resolveFilePayload = async (payloadString: string, vaultId: string, type: 'armored' | 'viewq'): Promise<string> => {
+    if (!payloadString) return '';
+    if (payloadString.startsWith('chunked:')) {
+      const parts = payloadString.split(':');
+      const vId = parts[1];
+      const fileType = parts[2] as 'armored' | 'viewq';
+      const chunksCount = parseInt(parts[3], 10);
+      
+      try {
+        const chunks: string[] = new Array(chunksCount);
+        const promises = [];
+        for (let i = 0; i < chunksCount; i++) {
+          const chunkId = `chunk_${vId}_${fileType}_${i}`;
+          const chunkRef = doc(db, 'vault_chunks', chunkId);
+          promises.push(
+            getDoc(chunkRef).then((chunkDoc) => {
+              if (chunkDoc.exists()) {
+                chunks[i] = chunkDoc.data().content;
+              } else {
+                throw new Error(`Chunk ${i} not found`);
+              }
+            })
+          );
+        }
+        await Promise.all(promises);
+        return chunks.join('');
+      } catch (err) {
+        console.error('Error fetching file chunks, falling back to local:', err);
+        // Fallback to local storage if chunks fetch fails
+        const localItem = localStorage.getItem(`local_vault_${fileType}_${vId}`);
+        if (localItem) return localItem;
+        throw err;
+      }
+    }
+    if (payloadString.startsWith('local_only:')) {
+      const id = payloadString.replace('local_only:', '');
+      const localItem = localStorage.getItem(`local_vault_${type}_${id}`);
+      if (localItem) return localItem;
+    }
+    return payloadString;
+  };
+
+  const resolveSharePayload = async (encryptedData: string, token: string): Promise<string> => {
+    if (!encryptedData) return '';
+    if (encryptedData.startsWith('chunked:')) {
+      const parts = encryptedData.split(':');
+      const sToken = parts[1];
+      const chunksCount = parseInt(parts[2], 10);
+      try {
+        const chunks: string[] = new Array(chunksCount);
+        const promises = [];
+        for (let i = 0; i < chunksCount; i++) {
+          const chunkId = `chunk_share_${sToken}_${i}`;
+          const chunkRef = doc(db, 'share_chunks', chunkId);
+          promises.push(
+            getDoc(chunkRef).then((chunkDoc) => {
+              if (chunkDoc.exists()) {
+                chunks[i] = chunkDoc.data().content;
+              } else {
+                throw new Error(`Share chunk ${i} not found`);
+              }
+            })
+          );
+        }
+        await Promise.all(promises);
+        return chunks.join('');
+      } catch (err) {
+        console.error('Error fetching share chunks, falling back to local:', err);
+        // Fallback to local share if chunk fetch fails
+        const localShare = ephemeralShares.find(s => s.token === token);
+        if (localShare && localShare.encryptedData && !localShare.encryptedData.startsWith('chunked:')) {
+          return localShare.encryptedData;
+        }
+        throw err;
+      }
+    }
+    return encryptedData;
+  };
+
   const markNotificationAsRead = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, status: 'read' } : n));
     setDoc(doc(db, 'notifications', id), { status: 'read' }, { merge: true }).catch((err) => {
       handleFirestoreError(err, OperationType.WRITE, `notifications/${id}`);
     });
@@ -422,24 +718,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteVault = (id: string) => {
     localStorage.removeItem(`local_vault_armored_${id}`);
     localStorage.removeItem(`local_vault_viewq_${id}`);
+    setVaults(prev => prev.filter(v => v.id !== id));
     deleteDoc(doc(db, 'vaults', id)).catch((err) => {
       handleFirestoreError(err, OperationType.DELETE, `vaults/${id}`);
     });
   };
 
-  const addEphemeralShare = (share: EphemeralShare) => {
-    setDoc(doc(db, 'shares', share.token), share).catch((err) => {
+  const addEphemeralShare = async (share: EphemeralShare) => {
+    setEphemeralShares(prev => {
+      if (prev.some(s => s.token === share.token)) return prev;
+      return [share, ...prev];
+    });
+
+    const shareForCloud = { ...share };
+    
+    if (share.encryptedData && share.encryptedData.length > 500000) {
+      try {
+        const CHUNK_SIZE = 500000;
+        const content = share.encryptedData;
+        const totalLength = content.length;
+        let index = 0;
+        const promises = [];
+        for (let i = 0; i < totalLength; i += CHUNK_SIZE) {
+          const chunk = content.substring(i, i + CHUNK_SIZE);
+          const chunkId = `chunk_share_${share.token}_${index}`;
+          const chunkRef = doc(db, 'share_chunks', chunkId);
+          promises.push(
+            setDoc(chunkRef, {
+              token: share.token,
+              index,
+              content: chunk,
+              createdAt: new Date().toISOString()
+            })
+          );
+          index++;
+        }
+        await Promise.all(promises);
+        shareForCloud.encryptedData = `chunked:${share.token}:${index}`;
+      } catch (err) {
+        console.error("Failed to save share to Firestore chunks:", err);
+      }
+    }
+
+    setDoc(doc(db, 'shares', share.token), stripUndefined(shareForCloud)).catch((err) => {
       handleFirestoreError(err, OperationType.WRITE, `shares/${share.token}`);
     });
   };
 
   const updateEphemeralShare = (updated: EphemeralShare) => {
-    setDoc(doc(db, 'shares', updated.token), updated).catch((err) => {
+    setEphemeralShares(prev => prev.map(s => s.token === updated.token ? updated : s));
+    setDoc(doc(db, 'shares', updated.token), stripUndefined(updated)).catch((err) => {
       handleFirestoreError(err, OperationType.WRITE, `shares/${updated.token}`);
     });
   };
 
   const deleteEphemeralShare = (token: string) => {
+    setEphemeralShares(prev => prev.filter(s => s.token !== token));
     deleteDoc(doc(db, 'shares', token)).catch((err) => {
       handleFirestoreError(err, OperationType.DELETE, `shares/${token}`);
     });
@@ -470,19 +804,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status = existingUser.status;
       profile = existingUser.profile;
     } else {
-      // Create new user registration entry in cloud
-      const newUser: RegisteredUser = {
-        username: username,
-        authType,
-        status,
-        registeredAt: new Date().toISOString()
-      };
-      if (profile !== undefined) {
-        newUser.profile = profile;
+      // Fallback check in local registered users
+      const match = registeredUsers.find(u => u.username.toLowerCase() === normalizedUsername);
+      if (match) {
+        status = match.status;
+        profile = match.profile;
+      } else {
+        // Create new user registration entry
+        const newUser: RegisteredUser = {
+          username: username,
+          authType,
+          status,
+          registeredAt: new Date().toISOString()
+        };
+        setRegisteredUsers(prev => [newUser, ...prev]);
+        setDoc(userDocRef, newUser).catch((err) => {
+          handleFirestoreError(err, OperationType.WRITE, `users/${normalizedUsername}`);
+        });
       }
-      setDoc(userDocRef, newUser).catch((err) => {
-        handleFirestoreError(err, OperationType.WRITE, `users/${normalizedUsername}`);
-      });
     }
 
     setUser({ username, authType, status, profile });
@@ -496,7 +835,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUserProfile = (profile: UserProfile) => {
     if (!user) return;
-    setUser(prev => prev ? { ...prev, profile } : null);
     
     const userDocData: any = {
       username: user.username,
@@ -508,6 +846,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userDocData.profile = profile;
     }
 
+    setUser(prev => prev ? { ...prev, profile } : null);
+    setRegisteredUsers(prev => prev.map(u => u.username.toLowerCase() === user.username.toLowerCase() ? { ...u, profile } : u));
+
     setDoc(doc(db, 'users', user.username.toLowerCase()), userDocData, { merge: true }).catch((err) => {
       handleFirestoreError(err, OperationType.WRITE, `users/${user.username.toLowerCase()}`);
     });
@@ -516,24 +857,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const approveUser = (username: string) => {
-    setDoc(doc(db, 'users', username.toLowerCase()), { status: 'approved' }, { merge: true }).catch((err) => {
-      handleFirestoreError(err, OperationType.WRITE, `users/${username.toLowerCase()}`);
-    });
+    setRegisteredUsers(prev => prev.map(u => u.username.toLowerCase() === username.toLowerCase() ? { ...u, status: 'approved' } : u));
     
     if (user && user.username.toLowerCase() === username.toLowerCase()) {
       setUser(prev => prev ? { ...prev, status: 'approved' } : null);
     }
+
+    setDoc(doc(db, 'users', username.toLowerCase()), { status: 'approved' }, { merge: true }).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `users/${username.toLowerCase()}`);
+    });
+    
     addLog('SUCCESS', `REGISTRO APROBADO: El usuario ${username.toUpperCase()} ha sido aprobado por el superadmin.`);
   };
 
   const rejectUser = (username: string) => {
-    setDoc(doc(db, 'users', username.toLowerCase()), { status: 'rejected' }, { merge: true }).catch((err) => {
-      handleFirestoreError(err, OperationType.WRITE, `users/${username.toLowerCase()}`);
-    });
+    setRegisteredUsers(prev => prev.map(u => u.username.toLowerCase() === username.toLowerCase() ? { ...u, status: 'rejected' } : u));
 
     if (user && user.username.toLowerCase() === username.toLowerCase()) {
       setUser(prev => prev ? { ...prev, status: 'rejected' } : null);
     }
+
+    setDoc(doc(db, 'users', username.toLowerCase()), { status: 'rejected' }, { merge: true }).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `users/${username.toLowerCase()}`);
+    });
+    
     addLog('SUCCESS', `REGISTRO RECHAZADO: El usuario ${username.toUpperCase()} ha sido rechazado por el superadmin.`);
   };
 
@@ -548,18 +895,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     const newLog: TerminalLog = { id, timestamp, level, message };
     setLogs(prev => [...prev, newLog]);
-    setDoc(doc(db, 'logs', id), newLog).catch((err) => {
-      handleFirestoreError(err, OperationType.WRITE, `logs/${id}`);
-    });
   };
 
   const clearLogs = () => {
-    // Delete all logs from cloud
-    logs.forEach(log => {
-      deleteDoc(doc(db, 'logs', log.id)).catch((err) => {
-        handleFirestoreError(err, OperationType.DELETE, `logs/${log.id}`);
-      });
-    });
     setLogs([]);
   };
 
@@ -700,6 +1038,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setLanguage,
         notifications,
         markNotificationAsRead,
+        resolveFilePayload,
+        resolveSharePayload,
+        firestoreStatus,
+        setFirestoreStatus,
       }}
     >
       {children}

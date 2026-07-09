@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Sliders, Eye, EyeOff, Save, ShieldAlert, Cpu, CheckCircle, Wallet, RefreshCw, Server, Info } from 'lucide-react';
+import { Sliders, Eye, EyeOff, Save, ShieldAlert, Cpu, CheckCircle, Wallet, RefreshCw, Server, Info, Cloud } from 'lucide-react';
 import { QPUTarget } from '../types';
 import { Keypair, Horizon } from '@stellar/stellar-sdk';
 import { translations } from '../translations';
@@ -19,6 +19,12 @@ export const SettingsView: React.FC = () => {
   const [stellarSecret, setStellarSecret] = useState(settings.stellarSourceSecret || '');
   const [stellarNetwork, setStellarNetwork] = useState<'testnet' | 'public'>(settings.stellarNetwork || 'testnet');
   const [showStellarSecret, setShowStellarSecret] = useState(false);
+
+  // Pinata IPFS State
+  const [pinataJwt, setPinataJwt] = useState(settings.pinataJwt || '');
+  const [pinataGateway, setPinataGateway] = useState(settings.pinataGateway || 'gateway.pinata.cloud');
+  const [usePinata, setUsePinata] = useState(settings.usePinata || false);
+  const [showPinataJwt, setShowPinataJwt] = useState(false);
 
   // Live Wallet Monitor State
   const [publicKey, setPublicKey] = useState<string>('');
@@ -106,12 +112,15 @@ export const SettingsView: React.FC = () => {
       apiProxyBaseUrl: proxyUrl.trim() || 'https://api.ionq.co/v0.3',
       stellarSourceSecret: stellarSecret,
       stellarNetwork: stellarNetwork,
+      pinataJwt: pinataJwt.trim(),
+      pinataGateway: pinataGateway.trim() || 'gateway.pinata.cloud',
+      usePinata: usePinata,
     });
 
     setSaveSuccess(true);
     addLog('SYSTEM', language === 'es' 
-      ? `Configuración general actualizada. Target QPU: ${target} // Red Stellar: ${stellarNetwork.toUpperCase()}`
-      : `General settings updated. Target QPU: ${target} // Stellar Network: ${stellarNetwork.toUpperCase()}`
+      ? `Configuración general actualizada. Target QPU: ${target} // Red Stellar: ${stellarNetwork.toUpperCase()} // IPFS: ${usePinata ? 'Pinata IPFS Activo' : 'Local/Cloud Chunking'}`
+      : `General settings updated. Target QPU: ${target} // Stellar Network: ${stellarNetwork.toUpperCase()} // IPFS: ${usePinata ? 'Pinata IPFS Active' : 'Local/Cloud Chunking'}`
     );
     
     setTimeout(() => {
@@ -333,6 +342,81 @@ export const SettingsView: React.FC = () => {
                   <option value="public">{language === 'es' ? 'Stellar Public Mainnet (Red de Producción - Cargos XLM Reales)' : 'Stellar Public Mainnet (Production Network - Real XLM Charges)'}</option>
                 </select>
               </div>
+            </div>
+
+            {/* PANEL 3: ALMACENAMIENTO DECENTRALIZADO IPFS (PINATA) */}
+            <div className="space-y-4 pt-4 border-t border-[#eaeaea]/50">
+              <div className="flex items-center justify-between pb-2 border-b border-[#fafafa]">
+                <div className="flex items-center gap-2">
+                  <Cloud size={15} className="text-black" />
+                  <h3 className="font-sans font-bold text-[10px] text-gray-900 uppercase tracking-widest">
+                    {language === 'es' ? 'Almacenamiento IPFS (Pinata)' : 'IPFS Storage (Pinata)'}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="usePinata"
+                    checked={usePinata}
+                    onChange={(e) => setUsePinata(e.target.checked)}
+                    className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                  />
+                  <label htmlFor="usePinata" className="text-[10px] font-sans font-bold text-gray-700 uppercase tracking-wide cursor-pointer">
+                    {language === 'es' ? 'Activar IPFS' : 'Enable IPFS'}
+                  </label>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-gray-500 leading-relaxed font-sans">
+                {language === 'es' 
+                  ? 'Si procesa archivos de gran tamaño que superen los límites de almacenamiento de la base de datos local, active Pinata IPFS para persistir sus evidencias .viewQ de forma totalmente descentralizada e inmutable.' 
+                  : 'If you process large files that exceed local database storage limits, enable Pinata IPFS to persist your .viewQ evidence files in a fully decentralized and immutable manner.'}
+              </p>
+
+              {usePinata && (
+                <div className="space-y-4 animate-fade-in">
+                  {/* PINATA_JWT */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-mono uppercase text-gray-400 font-bold">
+                        {language === 'es' ? 'Pinata JWT de API' : 'Pinata API JWT'}
+                      </label>
+                      <span className="text-[9px] text-gray-400 font-mono">Pinata JWT Token</span>
+                    </div>
+                    
+                    <div className="relative">
+                      <input
+                        type={showPinataJwt ? 'text' : 'password'}
+                        value={pinataJwt}
+                        onChange={(e) => setPinataJwt(e.target.value)}
+                        placeholder="eyJh..."
+                        className="w-full text-xs font-mono pl-3.5 pr-10 py-2.5 rounded-sm border border-[#eaeaea] bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPinataJwt(!showPinataJwt)}
+                        className="absolute right-3 top-2.5 text-gray-400 hover:text-black focus:outline-none"
+                      >
+                        {showPinataJwt ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* PINATA_GATEWAY */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono uppercase text-gray-400 font-bold">
+                      {language === 'es' ? 'Gateway Dedicado de Pinata' : 'Pinata Dedicated Gateway'}
+                    </label>
+                    <input
+                      type="text"
+                      value={pinataGateway}
+                      onChange={(e) => setPinataGateway(e.target.value)}
+                      placeholder="gateway.pinata.cloud"
+                      className="w-full text-xs font-mono px-3.5 py-2.5 rounded-sm border border-[#eaeaea] bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white transition-all"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action buttons */}

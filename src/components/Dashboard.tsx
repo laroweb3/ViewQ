@@ -26,7 +26,7 @@ import {
 
 export const Dashboard: React.FC = () => {
   const { isRunning, executePipeline, manifestResult } = useQuantum();
-  const { settings, logs, addLog, vaults, language, addEphemeralShare, setActiveTab, registeredUsers } = useApp();
+  const { settings, logs, addLog, vaults, language, addEphemeralShare, setActiveTab, registeredUsers, resolveFilePayload } = useApp();
   const t = translations[language];
   
   const [destinatario, setDestinatario] = useState('');
@@ -40,6 +40,8 @@ export const Dashboard: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showJson, setShowJson] = useState(false);
+  const [isDownloadingArmored, setIsDownloadingArmored] = useState(false);
+  const [isDownloadingViewQ, setIsDownloadingViewQ] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -126,8 +128,10 @@ export const Dashboard: React.FC = () => {
     let recipientUser = selectedRecipientUsername;
     if (!recipientUser) {
       const match = registeredUsers.find(
-        u => u.username.toLowerCase() === destinatario.trim().toLowerCase() ||
-        (u.profile && `${u.profile.nombres} ${u.profile.apellidos}`.toLowerCase() === destinatario.trim().toLowerCase())
+        u => u.status === 'approved' && (
+          u.username.toLowerCase() === destinatario.trim().toLowerCase() ||
+          (u.profile && `${u.profile.nombres} ${u.profile.apellidos}`.toLowerCase() === destinatario.trim().toLowerCase())
+        )
       );
       if (match) {
         recipientUser = match.username;
@@ -192,9 +196,15 @@ export const Dashboard: React.FC = () => {
   };
 
   // Download armored file with embedded metadata
-  const downloadArmoredFile = () => {
+  const downloadArmoredFile = async () => {
     const currentVault = vaults.find(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash);
-    const base64DataUrl = currentVault?.armoredFileBase64;
+    if (!currentVault) {
+      alert(language === 'es' 
+        ? 'Sincronizando con la base de datos... Por favor, espere un segundo e intente de nuevo.' 
+        : 'Syncing with database... Please wait a second and try again.');
+      return;
+    }
+    const base64DataUrl = currentVault.armoredFileBase64;
     if (!base64DataUrl) {
       alert(language === 'es' 
         ? 'Archivo blindado no disponible en los metadatos de esta bóveda.' 
@@ -202,28 +212,36 @@ export const Dashboard: React.FC = () => {
       return;
     }
 
-    if (base64DataUrl.startsWith('local_only:')) {
-      alert(language === 'es' 
-        ? 'Este archivo supera el límite de tamaño de la nube (1 MB) y solo está guardado en el dispositivo del perito que lo creó originalmente.' 
-        : 'This file exceeds the cloud size limit (1 MB) and is only saved on the device of the auditor who originally created it.');
-      return;
+    setIsDownloadingArmored(true);
+    try {
+      const resolvedDataUrl = await resolveFilePayload(base64DataUrl, currentVault.id, 'armored');
+      const filename = currentVault.manifest.payload.originalFilename || 'evidencia_blindada.txt';
+      const link = document.createElement('a');
+      link.href = resolvedDataUrl;
+      link.download = `blindado_${filename}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      addLog('SUCCESS', `Evidencia blindada descargada localmente: blindado_${filename}`);
+    } catch (err) {
+      console.error(err);
+      alert(language === 'es' ? 'Error al descargar el archivo' : 'Error downloading file');
+    } finally {
+      setIsDownloadingArmored(false);
     }
-
-    const filename = currentVault.manifest.payload.originalFilename || 'evidencia_blindada.txt';
-    const link = document.createElement('a');
-    link.href = base64DataUrl;
-    link.download = `blindado_${filename}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    addLog('SUCCESS', `Evidencia blindada descargada localmente: blindado_${filename}`);
   };
 
   // Download encrypted .viewQ file
-  const downloadViewQFile = () => {
+  const downloadViewQFile = async () => {
     const currentVault = vaults.find(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash);
-    const base64DataUrl = currentVault?.viewQFileBase64;
+    if (!currentVault) {
+      alert(language === 'es' 
+        ? 'Sincronizando con la base de datos... Por favor, espere un segundo e intente de nuevo.' 
+        : 'Syncing with database... Please wait a second and try again.');
+      return;
+    }
+    const base64DataUrl = currentVault.viewQFileBase64;
     if (!base64DataUrl) {
       alert(language === 'es' 
         ? 'Archivo .viewQ no disponible en los metadatos de esta bóveda.' 
@@ -231,27 +249,29 @@ export const Dashboard: React.FC = () => {
       return;
     }
 
-    if (base64DataUrl.startsWith('local_only:')) {
-      alert(language === 'es' 
-        ? 'Este archivo supera el límite de tamaño de la nube (1 MB) y solo está guardado en el dispositivo del perito que lo creó originalmente.' 
-        : 'This file exceeds the cloud size limit (1 MB) and is only saved on the device of the auditor who originally created it.');
-      return;
-    }
-
-    const originalName = currentVault.manifest.payload.originalFilename || 'evidencia.txt';
-    const baseName = originalName.includes('.') 
-      ? originalName.substring(0, originalName.lastIndexOf('.'))
-      : originalName;
+    setIsDownloadingViewQ(true);
+    try {
+      const resolvedDataUrl = await resolveFilePayload(base64DataUrl, currentVault.id, 'viewq');
+      const originalName = currentVault.manifest.payload.originalFilename || 'evidencia.txt';
+      const baseName = originalName.includes('.') 
+        ? originalName.substring(0, originalName.lastIndexOf('.'))
+        : originalName;
+        
+      const filename = `${baseName}.viewQ`;
+      const link = document.createElement('a');
+      link.href = resolvedDataUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       
-    const filename = `${baseName}.viewQ`;
-    const link = document.createElement('a');
-    link.href = base64DataUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    addLog('SUCCESS', `Archivo de evidencia encriptado .viewQ descargado: ${filename}`);
+      addLog('SUCCESS', `Archivo de evidencia encriptado .viewQ descargado: ${filename}`);
+    } catch (err) {
+      console.error(err);
+      alert(language === 'es' ? 'Error al descargar el archivo' : 'Error downloading file');
+    } finally {
+      setIsDownloadingViewQ(false);
+    }
   };
 
   // Calculate timeline states based on real-time execution logs
@@ -353,7 +373,7 @@ export const Dashboard: React.FC = () => {
                     onChange={(e) => {
                       const val = e.target.value;
                       setDestinatario(val);
-                      const match = registeredUsers.find(u => u.username.toLowerCase() === val.trim().toLowerCase());
+                      const match = registeredUsers.find(u => u.status === 'approved' && u.username.toLowerCase() === val.trim().toLowerCase());
                       if (match) {
                         setSelectedRecipientUsername(match.username);
                       } else {
@@ -371,6 +391,7 @@ export const Dashboard: React.FC = () => {
                   
                   {/* Suggestions Dropdown */}
                   {showSuggestions && (destinatario.trim() ? registeredUsers.filter(u => {
+                    if (u.status !== 'approved') return false;
                     const query = destinatario.toLowerCase();
                     const usernameMatch = u.username.toLowerCase().includes(query);
                     const nameMatch = u.profile ? `${u.profile.nombres} ${u.profile.apellidos}`.toLowerCase().includes(query) : false;
@@ -379,6 +400,7 @@ export const Dashboard: React.FC = () => {
                   }) : []).length > 0 && (
                     <div className="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto bg-white border border-[#eaeaea] rounded-sm shadow-md divide-y divide-gray-100">
                       {(destinatario.trim() ? registeredUsers.filter(u => {
+                        if (u.status !== 'approved') return false;
                         const query = destinatario.toLowerCase();
                         const usernameMatch = u.username.toLowerCase().includes(query);
                         const nameMatch = u.profile ? `${u.profile.nombres} ${u.profile.apellidos}`.toLowerCase().includes(query) : false;
@@ -756,34 +778,31 @@ export const Dashboard: React.FC = () => {
                   : (language === 'es' ? 'Copiar JSON' : 'Copy JSON')}
               </button>
 
-              <button
-                onClick={downloadManifestFile}
-                className="flex items-center gap-1.5 bg-black text-white hover:bg-opacity-90 px-3.5 py-2 rounded-sm text-xs font-sans font-semibold transition-colors cursor-pointer"
-                id="download-json-btn"
-              >
-                <Download size={13} />
-                {language === 'es' ? 'Descargar Manifiesto' : 'Download Manifest'}
-              </button>
-
-              {vaults.some(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash && v.armoredFileBase64) && (
+              {manifestResult && (
                 <button
-                  onClick={downloadArmoredFile}
-                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-sm text-xs font-sans font-semibold transition-colors cursor-pointer"
-                  id="download-armored-btn"
+                  onClick={downloadViewQFile}
+                  disabled={isDownloadingViewQ}
+                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-sm text-xs font-sans font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  id="download-viewq-btn"
                 >
-                  <FileCheck2 size={13} />
-                  {language === 'es' ? 'Descargar Evidencia Blindada' : 'Download Armored Evidence'}
+                  <Lock size={13} className={isDownloadingViewQ ? 'animate-spin' : ''} />
+                  {isDownloadingViewQ
+                    ? (language === 'es' ? 'Descargando...' : 'Downloading...')
+                    : (language === 'es' ? 'Descargar Evidencia .viewQ' : 'Download .viewQ Evidence')}
                 </button>
               )}
 
-              {vaults.some(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash && v.viewQFileBase64) && (
+              {manifestResult && (
                 <button
-                  onClick={downloadViewQFile}
-                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-sm text-xs font-sans font-semibold transition-colors cursor-pointer animate-pulse"
-                  id="download-viewq-btn"
+                  onClick={downloadArmoredFile}
+                  disabled={isDownloadingArmored}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-sm text-xs font-sans font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  id="download-armored-btn"
                 >
-                  <Lock size={13} />
-                  {language === 'es' ? 'Descargar Evidencia .viewQ' : 'Download .viewQ Evidence'}
+                  <FileCheck2 size={13} className={isDownloadingArmored ? 'animate-spin' : ''} />
+                  {isDownloadingArmored 
+                    ? (language === 'es' ? 'Descargando...' : 'Downloading...')
+                    : (language === 'es' ? 'Descargar Evidencia Blindada' : 'Download Armored Evidence')}
                 </button>
               )}
             </div>
@@ -1002,32 +1021,32 @@ export const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-xs text-gray-600 leading-relaxed font-sans">
                     {language === 'es' 
-                      ? 'Descargue el manifiesto de la custodia o el archivo de evidencia blindada. Puede enviarlo por cualquier canal seguro estándar (correo institucional, pendrive, o sistema pericial). El destinatario podrá subir el archivo en la pestaña "Verificador Forense" de su sistema para descifrarlo con su llave y auditar la cadena de custodia.' 
-                      : 'Download the custody manifest or armored evidence file. Send it via any standard secure channel (institutional email, secure drive, or forensic folders). The recipient can upload it to the "Forensic Verification" tab to decrypt with their key and audit the chain of custody.'}
+                      ? 'Descargue el archivo de evidencia encriptado .viewQ o el archivo de evidencia blindada. Puede enviarlo por cualquier canal seguro estándar (correo institucional, pendrive, o sistema pericial). El destinatario podrá subir el archivo en la pestaña "Verificador Forense" de su sistema para descifrarlo con su llave y auditar la cadena de custodia.' 
+                      : 'Download the encrypted .viewQ file or armored evidence file. Send it via any standard secure channel (institutional email, secure drive, or forensic folders). The recipient can upload it to the "Forensic Verification" tab to decrypt with their key and audit the chain of custody.'}
                   </p>
                 </div>
                 
                 <div className="pt-2 flex flex-col sm:flex-row gap-2">
-                  <button
-                    onClick={downloadManifestFile}
-                    className="flex-1 py-2 bg-white hover:bg-gray-50 text-gray-800 border border-[#eaeaea] text-[11px] font-sans font-bold uppercase tracking-wider transition-all rounded-sm cursor-pointer text-center"
-                  >
-                    {language === 'es' ? 'Descargar Manifiesto' : 'Download Manifest'}
-                  </button>
-                  {vaults.some(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash && v.armoredFileBase64) && (
-                    <button
-                      onClick={downloadArmoredFile}
-                      className="flex-1 py-2 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-sans font-bold uppercase tracking-wider transition-all rounded-sm cursor-pointer text-center"
-                    >
-                      {language === 'es' ? 'Descargar Blindado' : 'Download Armored'}
-                    </button>
-                  )}
-                  {vaults.some(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash && v.viewQFileBase64) && (
+                  {manifestResult && (
                     <button
                       onClick={downloadViewQFile}
-                      className="flex-1 py-2 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200 text-[11px] font-sans font-bold uppercase tracking-wider transition-all rounded-sm cursor-pointer text-center"
+                      disabled={isDownloadingViewQ}
+                      className="flex-1 py-2 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200 text-[11px] font-sans font-semibold uppercase tracking-wider transition-all rounded-sm cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {language === 'es' ? 'Descargar .viewQ' : 'Download .viewQ'}
+                      {isDownloadingViewQ
+                        ? (language === 'es' ? 'Descargando...' : 'Downloading...')
+                        : (language === 'es' ? 'Descargar .viewQ' : 'Download .viewQ')}
+                    </button>
+                  )}
+                  {manifestResult && (
+                    <button
+                      onClick={downloadArmoredFile}
+                      disabled={isDownloadingArmored}
+                      className="flex-1 py-2 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-sans font-semibold uppercase tracking-wider transition-all rounded-sm cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isDownloadingArmored 
+                        ? (language === 'es' ? 'Descargando...' : 'Downloading...')
+                        : (language === 'es' ? 'Descargar Blindado' : 'Download Armored')}
                     </button>
                   )}
                 </div>
@@ -1057,8 +1076,8 @@ export const Dashboard: React.FC = () => {
                     const filename = manifestResult.payload.originalFilename || 'evidencia_sellada.txt';
                     const encryptedData = manifestResult.payload.encryptedData;
                     const token = manifestResult.quantumSource.quantumSeed.substring(0, 16) || Math.random().toString(36).substring(2, 10);
-                    const iv = manifestResult.quantumSource.quantumSeed.substring(16, 28) || '0123456789ab';
-                    const aesKeyHex = manifestResult.cryptographicKeys.sharedSecretSs.substring(0, 32);
+                    const iv = manifestResult.payload.iv;
+                    const aesKeyHex = manifestResult.cryptographicKeys.sharedSecretSs;
 
                     const newShare = {
                       token,

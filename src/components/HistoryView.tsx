@@ -19,18 +19,44 @@ import {
   Unlock,
   Eye,
   EyeOff,
-  Calendar
+  Calendar,
+  Search,
+  X
 } from 'lucide-react';
 
 export const HistoryView: React.FC = () => {
-  const { vaults, deleteVault, addLog, language } = useApp();
+  const { vaults, deleteVault, addLog, language, resolveFilePayload } = useApp();
   const t = translations[language];
   
   const [selectedVault, setSelectedVault] = useState<VaultRecord | null>(null);
   const [decryptedText, setDecryptedText] = useState<string | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [decryptError, setDecryptError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'sim' | 'qpu'>('all');
+
+  const filteredVaults = vaults.filter(record => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = 
+      record.title.toLowerCase().includes(term) ||
+      (record.notes && record.notes.toLowerCase().includes(term)) ||
+      record.id.toLowerCase().includes(term) ||
+      (record.manifest.payload.originalFilename && record.manifest.payload.originalFilename.toLowerCase().includes(term));
+
+    if (!matchesSearch) return false;
+
+    if (filterType === 'sim') {
+      return record.manifest.quantumSource.isSimulated;
+    }
+    if (filterType === 'qpu') {
+      return !record.manifest.quantumSource.isSimulated;
+    }
+
+    return true;
+  });
 
   // Trigger decapsulation and decryption (unsealing)
   const handleUnseal = async (record: VaultRecord) => {
@@ -169,6 +195,90 @@ export const HistoryView: React.FC = () => {
             {language === 'es' ? 'Archivos Sellados' : 'Sealed Files'}
           </h3>
 
+          {/* Search and Quick Filters */}
+          <div className="space-y-3 bg-white border border-[#eaeaea] p-3 rounded-sm shadow-2xs">
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Search size={14} className="text-gray-400" />
+              </span>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder={language === 'es' ? 'Buscar por expediente o notas...' : 'Search by record or notes...'}
+                className="w-full text-xs pl-9 pr-8 py-2 border border-gray-200 rounded-sm focus:outline-none focus:border-black font-sans transition-colors placeholder:text-gray-400 bg-[#fafafa] focus:bg-white"
+                id="vault-search-input"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-400 hover:text-black cursor-pointer"
+                  id="clear-vault-search-btn"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Filters */}
+            <div className="flex gap-1.5 pt-0.5">
+              <button
+                onClick={() => setFilterType('all')}
+                className={`px-2.5 py-1 text-[10px] font-sans font-medium rounded-sm border transition-all cursor-pointer ${
+                  filterType === 'all'
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-black'
+                }`}
+                id="filter-all-btn"
+              >
+                {language === 'es' ? 'Todos' : 'All'}
+              </button>
+              <button
+                onClick={() => setFilterType('qpu')}
+                className={`px-2.5 py-1 text-[10px] font-sans font-medium rounded-sm border transition-all cursor-pointer ${
+                  filterType === 'qpu'
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-black'
+                }`}
+                id="filter-qpu-btn"
+              >
+                QPU
+              </button>
+              <button
+                onClick={() => setFilterType('sim')}
+                className={`px-2.5 py-1 text-[10px] font-sans font-medium rounded-sm border transition-all cursor-pointer ${
+                  filterType === 'sim'
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-black'
+                }`}
+                id="filter-sim-btn"
+              >
+                {language === 'es' ? 'Simulados' : 'Simulated'}
+              </button>
+            </div>
+            
+            {/* Search counts or Reset option */}
+            {(searchTerm || filterType !== 'all') && (
+              <div className="text-[10px] text-gray-500 font-sans flex justify-between items-center bg-gray-50 px-2.5 py-1 rounded-sm border border-gray-100">
+                <span>
+                  {language === 'es' 
+                    ? `Encontrados: ${filteredVaults.length} de ${vaults.length}` 
+                    : `Found: ${filteredVaults.length} of ${vaults.length}`}
+                </span>
+                <button 
+                  onClick={() => {
+                    setSearchTerm('');
+                    setFilterType('all');
+                  }}
+                  className="text-black font-semibold hover:underline cursor-pointer"
+                  id="reset-vault-filters-btn"
+                >
+                  {language === 'es' ? 'Restablecer' : 'Reset'}
+                </button>
+              </div>
+            )}
+          </div>
+
           {vaults.length === 0 ? (
             <div className="border border-[#eaeaea] rounded-sm p-8 text-center text-gray-400 bg-[#fafafa]">
               <Database size={24} className="mx-auto text-gray-300 mb-2" />
@@ -177,8 +287,20 @@ export const HistoryView: React.FC = () => {
                 {t.emptyHistory}
               </p>
             </div>
+          ) : filteredVaults.length === 0 ? (
+            <div className="border border-[#eaeaea] rounded-sm p-8 text-center text-gray-400 bg-[#fafafa]">
+              <Search size={24} className="mx-auto text-gray-300 mb-2 text-gray-300" />
+              <p className="text-xs font-semibold text-gray-600">
+                {language === 'es' ? 'Sin resultados' : 'No results found'}
+              </p>
+              <p className="text-[11px] mt-1 text-gray-400 leading-normal">
+                {language === 'es' 
+                  ? 'No se encontraron expedientes que coincidan con los criterios de búsqueda.' 
+                  : 'No case records found matching your search criteria.'}
+              </p>
+            </div>
           ) : (
-            vaults.map((record) => {
+            filteredVaults.map((record) => {
               const isSelected = selectedVault?.id === record.id;
               const dateStr = new Date(record.timestamp).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
                 year: 'numeric',
@@ -273,26 +395,32 @@ export const HistoryView: React.FC = () => {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {selectedVault.armoredFileBase64 && (
                     <button
-                      onClick={() => {
-                        if (selectedVault.armoredFileBase64!.startsWith('local_only:')) {
-                          alert(language === 'es' 
-                            ? 'Este archivo supera el límite de tamaño de la nube (1 MB) y solo está guardado en el dispositivo del perito que lo creó originalmente.' 
-                            : 'This file exceeds the cloud size limit (1 MB) and is only saved on the device of the auditor who originally created it.');
-                          return;
+                      onClick={async () => {
+                        setIsDownloading(true);
+                        try {
+                          const resolvedDataUrl = await resolveFilePayload(selectedVault.armoredFileBase64!, selectedVault.id, 'armored');
+                          const link = document.createElement('a');
+                          link.href = resolvedDataUrl;
+                          link.download = `${language === 'es' ? 'blindado' : 'shielded'}_${selectedVault.manifest.payload.originalFilename || 'archivo.bin'}`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        } catch (err) {
+                          console.error(err);
+                          alert(language === 'es' ? 'Error al descargar' : 'Error downloading');
+                        } finally {
+                          setIsDownloading(false);
                         }
-                        const link = document.createElement('a');
-                        link.href = selectedVault.armoredFileBase64!;
-                        link.download = `${language === 'es' ? 'blindado' : 'shielded'}_${selectedVault.manifest.payload.originalFilename || 'archivo.bin'}`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
                       }}
-                      className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 px-3 py-1.5 rounded-sm text-xs font-sans font-semibold transition-all cursor-pointer"
+                      disabled={isDownloading}
+                      className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 px-3 py-1.5 rounded-sm text-xs font-sans font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       title={language === 'es' ? 'Descargar Archivo Blindado con Metadatos Inyectados' : 'Download Shielded File with Injected Metadata'}
                       id="download-history-armored-btn"
                     >
-                      <Download size={13} />
-                      {language === 'es' ? 'Evidencia Blindada' : 'Shielded Evidence'}
+                      <Download size={13} className={isDownloading ? 'animate-spin' : ''} />
+                      {isDownloading 
+                        ? (language === 'es' ? 'Descargando...' : 'Downloading...')
+                        : (language === 'es' ? 'Evidencia Blindada' : 'Shielded Evidence')}
                     </button>
                   )}
                   

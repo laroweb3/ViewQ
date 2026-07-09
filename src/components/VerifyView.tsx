@@ -37,6 +37,7 @@ interface VerificationResult {
   filesize: number;
   format: 'pdf' | 'steg' | 'none' | 'json';
   stellarTx: string | null;
+  stellarNetwork?: 'testnet' | 'public';
   ionqJobId: string | null;
   originalHash: string | null;
   currentHash: string;
@@ -47,7 +48,7 @@ interface VerificationResult {
 }
 
 export const VerifyView: React.FC = () => {
-  const { addLog, vaults, language } = useApp();
+  const { addLog, vaults, language, settings } = useApp();
   const t = translations[language];
   
   const [selectedFile, setSelectedFile] = useState<{ name: string; size: number; bytes: Uint8Array } | null>(null);
@@ -148,6 +149,7 @@ export const VerifyView: React.FC = () => {
           filesize: selectedFile.size,
           format: 'steg',
           stellarTx: null,
+          stellarNetwork: settings.stellarNetwork,
           ionqJobId: null,
           originalHash: null,
           currentHash: 'ERROR_DECIPHER_FAILED',
@@ -166,6 +168,7 @@ export const VerifyView: React.FC = () => {
         const ionqJobId = viewQHeader.ionqJobId || manifestData.quantumSource.jobId;
         const ledgerNumber = manifestData.stellarNotarization?.ledger || (51890100 + Math.floor(Math.random() * 50000));
         const notarizedTimestamp = manifestData.stellarNotarization?.timestamp || new Date().toISOString();
+        const stellarNetwork = manifestData?.stellarNotarization?.network || settings.stellarNetwork;
 
         setResult({
           isValid: true,
@@ -174,13 +177,14 @@ export const VerifyView: React.FC = () => {
           filesize: selectedFile.size,
           format: 'steg',
           stellarTx,
+          stellarNetwork,
           ionqJobId,
           originalHash,
           currentHash: originalHash,
           ledgerNumber,
           notarizedTimestamp,
           auditorName: 'Vibedesk Forensics Node 1',
-          certifiedBy: manifestData.certifiedBy
+          certifiedBy: manifestData?.certifiedBy
         });
 
         setDecryptedContent({
@@ -222,6 +226,7 @@ export const VerifyView: React.FC = () => {
         const ionqJobId = manifestData.quantumSource.jobId;
         const ledgerNumber = manifestData.stellarNotarization?.ledger || (51890100 + Math.floor(Math.random() * 50000));
         const notarizedTimestamp = manifestData.stellarNotarization?.timestamp || new Date().toISOString();
+        const stellarNetwork = manifestData?.stellarNotarization?.network || settings.stellarNetwork;
 
         setResult({
           isValid: true,
@@ -230,13 +235,14 @@ export const VerifyView: React.FC = () => {
           filesize: selectedFile.size,
           format: 'json',
           stellarTx,
+          stellarNetwork,
           ionqJobId,
           originalHash,
           currentHash: originalHash,
           ledgerNumber,
           notarizedTimestamp,
           auditorName: 'Vibedesk Forensics Node 1',
-          certifiedBy: manifestData.certifiedBy
+          certifiedBy: manifestData?.certifiedBy
         });
 
         addLog('SUCCESS', `¡Verificación forense exitosa para el Manifiesto ${selectedFile.name}! Sello cuántico validado contra Stellar.`);
@@ -318,6 +324,7 @@ export const VerifyView: React.FC = () => {
         v.stellarNotarization?.txHash === extracted.stellarTx
       );
       const certifiedBy = matchedVaultForProfile?.manifest?.certifiedBy;
+      const stellarNetwork = matchedVaultForProfile?.stellarNotarization?.network || matchedVaultForProfile?.manifest?.stellarNotarization?.network || settings.stellarNetwork;
 
       setResult({
         isValid: hasMetadata || extracted.originalHash !== null ? isValid : false,
@@ -326,6 +333,7 @@ export const VerifyView: React.FC = () => {
         filesize: selectedFile.size,
         format: extracted.format,
         stellarTx: extracted.stellarTx,
+        stellarNetwork,
         ionqJobId: extracted.ionqJobId,
         originalHash: extracted.originalHash,
         currentHash,
@@ -375,7 +383,12 @@ export const VerifyView: React.FC = () => {
         </div>
         <div className="flex items-center gap-2 text-[11px] font-mono bg-gray-50 text-gray-600 px-3 py-1.5 rounded-sm border border-[#eaeaea]">
           <Globe size={13} className="text-gray-400" />
-          <span>{language === 'es' ? 'RED ESTÁNDAR: ' : 'STANDARD NETWORK: '}<strong className="text-black font-semibold uppercase">STELLAR TESTNET</strong></span>
+          <span>
+            {language === 'es' ? 'RED ESTÁNDAR: ' : 'STANDARD NETWORK: '}
+            <strong className="text-black font-semibold uppercase">
+              {settings.stellarNetwork === 'public' ? 'STELLAR MAINNET' : 'STELLAR TESTNET'}
+            </strong>
+          </span>
         </div>
       </div>
 
@@ -556,7 +569,7 @@ export const VerifyView: React.FC = () => {
                             Ledger: #{result.ledgerNumber}
                           </span>
                           <a
-                            href={`https://stellar.expert/explorer/testnet/tx/${result.stellarTx}`}
+                            href={`https://stellar.expert/explorer/${(result.stellarNetwork || settings.stellarNetwork) === 'public' ? 'public' : 'testnet'}/tx/${result.stellarTx}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline font-semibold font-sans text-[9px]"
