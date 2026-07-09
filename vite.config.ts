@@ -23,15 +23,15 @@ export default defineConfig(() => {
           start_url: '/',
           icons: [
             {
-              src: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=192&q=80',
+              src: '/logo.svg',
               sizes: '192x192',
-              type: 'image/png',
+              type: 'image/svg+xml',
               purpose: 'any maskable'
             },
             {
-              src: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=512&q=80',
+              src: '/logo.svg',
               sizes: '512x512',
-              type: 'image/png',
+              type: 'image/svg+xml',
               purpose: 'any maskable'
             }
           ]
@@ -44,10 +44,10 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
+      // HMR is disabled by VibeDesk via DISABLE_HMR env var.
+      // Do not modify—file watching is disabled to prevent flickering during builder edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
+      // Disable file watching when DISABLE_HMR is true to save CPU during builder edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };

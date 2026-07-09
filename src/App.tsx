@@ -13,6 +13,11 @@ import { SettingsView } from './components/SettingsView';
 import { SharesView } from './components/SharesView';
 import { VerifyView } from './components/VerifyView';
 import { AuthScreen } from './components/AuthScreen';
+import { WikiView } from './components/WikiView';
+import { ProfileWizard } from './components/ProfileWizard';
+import { ApprovalStatusScreen } from './components/ApprovalStatusScreen';
+import { UsersView } from './components/UsersView';
+import { NotificationsView } from './components/NotificationsView';
 
 const MainLayout: React.FC = () => {
   const { activeTab, sidebarOpen, user } = useApp();
@@ -31,6 +36,12 @@ const MainLayout: React.FC = () => {
         return <SharesView />;
       case 'verify':
         return <VerifyView />;
+      case 'wiki':
+        return <WikiView />;
+      case 'users':
+        return <UsersView />;
+      case 'notifications':
+        return <NotificationsView />;
       default:
         return <Dashboard />;
     }
@@ -40,15 +51,23 @@ const MainLayout: React.FC = () => {
     return <AuthScreen />;
   }
 
+  if (user.status !== 'approved') {
+    return <ApprovalStatusScreen />;
+  }
+
+  if (!user.profile) {
+    return <ProfileWizard />;
+  }
+
   return (
-    <div className="min-h-screen bg-[#fafafa] flex text-gray-900 selection:bg-black/5">
+    <div className="min-h-screen bg-[#fafafa] flex text-gray-900 selection:bg-black/5 overflow-x-hidden">
       {/* Collapsible Left Navigation Sidebar */}
       <Sidebar />
 
       {/* Main Content Area */}
       <main 
         id="main-viewport"
-        className="flex-1 min-w-0 min-h-screen flex flex-col transition-all duration-300 ease-in-out pl-0"
+        className="flex-1 min-w-0 min-h-screen flex flex-col transition-all duration-300 ease-in-out pl-0 overflow-x-hidden"
       >
         {/* Top Header Spacing Padding for mobile toggles */}
         <div className="h-16 md:h-0 w-full flex-shrink-0" />

@@ -56,6 +56,7 @@ export interface SealingManifest {
     encryptedData: string; // hex or base64 encrypted data
   };
   stellarNotarization?: StellarNotarization;
+  certifiedBy?: UserProfile;
 }
 
 export interface VaultRecord {
@@ -66,6 +67,25 @@ export interface VaultRecord {
   notes?: string;
   stellarNotarization?: StellarNotarization;
   armoredFileBase64?: string; // Appended or injected metadata file in base64
+  viewQFileBase64?: string; // Encrypted .viewQ file in base64/dataurl
+  destinatario?: string;
+  recipientUsername?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  sender: string;
+  senderProfile?: UserProfile;
+  recipientUsername: string;
+  timestamp: string;
+  vaultId: string;
+  title: string;
+  notes: string;
+  originalFilename?: string;
+  sha3Hash: string;
+  status: 'unread' | 'read';
+  stellarTxHash?: string;
+  ledger?: number;
 }
 
 export interface EphemeralShare {
@@ -88,5 +108,25 @@ export interface EphemeralShare {
     stellarTxHash?: string;
   };
 }
+
+export interface UserProfile {
+  nombres: string;
+  apellidos: string;
+  nacionalidad: string;
+  dni: string;
+  matricula: string;
+  jurisdiccion: string;
+  contacto: string;
+  email: string;
+}
+
+export interface RegisteredUser {
+  username: string;
+  authType: 'passkey' | 'diceware';
+  status: 'pending' | 'approved' | 'rejected';
+  profile?: UserProfile;
+  registeredAt: string;
+}
+
 
 

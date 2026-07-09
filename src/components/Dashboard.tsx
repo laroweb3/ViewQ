@@ -17,15 +17,21 @@ import {
   FileCheck2,
   FileSpreadsheet,
   AlertCircle,
-  Clock
+  Clock,
+  Share2,
+  Link2,
+  Send,
+  HelpCircle
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const { isRunning, executePipeline, manifestResult } = useQuantum();
-  const { settings, logs, addLog, vaults, language } = useApp();
+  const { settings, logs, addLog, vaults, language, addEphemeralShare, setActiveTab, registeredUsers } = useApp();
   const t = translations[language];
   
   const [destinatario, setDestinatario] = useState('');
+  const [selectedRecipientUsername, setSelectedRecipientUsername] = useState<string>('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [notes, setNotes] = useState('');
   const [payloadText, setPayloadText] = useState('');
   const [selectedFile, setSelectedFile] = useState<{ name: string; size: number; type: string; content: string } | null>(null);
@@ -116,7 +122,19 @@ export const Dashboard: React.FC = () => {
     const finalTitle = `Para: ${destinatario} | ${selectedFile ? selectedFile.name : 'Mensaje Directo'}`;
     const finalNotes = notes.trim() || `Evidencia sellada bajo protección poscuántica enviada a: ${destinatario}.`;
 
-    await executePipeline(finalPayload, finalTitle, finalFilename, finalNotes);
+    // Try to resolve a recipientUsername if it is not selected or matches typed name
+    let recipientUser = selectedRecipientUsername;
+    if (!recipientUser) {
+      const match = registeredUsers.find(
+        u => u.username.toLowerCase() === destinatario.trim().toLowerCase() ||
+        (u.profile && `${u.profile.nombres} ${u.profile.apellidos}`.toLowerCase() === destinatario.trim().toLowerCase())
+      );
+      if (match) {
+        recipientUser = match.username;
+      }
+    }
+
+    await executePipeline(finalPayload, finalTitle, finalFilename, finalNotes, destinatario, recipientUser || undefined);
   };
 
   // Copy manifest to clipboard with sandbox safety fallback
@@ -178,7 +196,16 @@ export const Dashboard: React.FC = () => {
     const currentVault = vaults.find(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash);
     const base64DataUrl = currentVault?.armoredFileBase64;
     if (!base64DataUrl) {
-      alert('Archivo blindado no disponible en los metadatos de esta bóveda.');
+      alert(language === 'es' 
+        ? 'Archivo blindado no disponible en los metadatos de esta bóveda.' 
+        : 'Shielded file not available in this vault\'s metadata.');
+      return;
+    }
+
+    if (base64DataUrl.startsWith('local_only:')) {
+      alert(language === 'es' 
+        ? 'Este archivo supera el límite de tamaño de la nube (1 MB) y solo está guardado en el dispositivo del perito que lo creó originalmente.' 
+        : 'This file exceeds the cloud size limit (1 MB) and is only saved on the device of the auditor who originally created it.');
       return;
     }
 
@@ -191,6 +218,40 @@ export const Dashboard: React.FC = () => {
     document.body.removeChild(link);
     
     addLog('SUCCESS', `Evidencia blindada descargada localmente: blindado_${filename}`);
+  };
+
+  // Download encrypted .viewQ file
+  const downloadViewQFile = () => {
+    const currentVault = vaults.find(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash);
+    const base64DataUrl = currentVault?.viewQFileBase64;
+    if (!base64DataUrl) {
+      alert(language === 'es' 
+        ? 'Archivo .viewQ no disponible en los metadatos de esta bóveda.' 
+        : 'Encrypted .viewQ file not available in this vault\'s metadata.');
+      return;
+    }
+
+    if (base64DataUrl.startsWith('local_only:')) {
+      alert(language === 'es' 
+        ? 'Este archivo supera el límite de tamaño de la nube (1 MB) y solo está guardado en el dispositivo del perito que lo creó originalmente.' 
+        : 'This file exceeds the cloud size limit (1 MB) and is only saved on the device of the auditor who originally created it.');
+      return;
+    }
+
+    const originalName = currentVault.manifest.payload.originalFilename || 'evidencia.txt';
+    const baseName = originalName.includes('.') 
+      ? originalName.substring(0, originalName.lastIndexOf('.'))
+      : originalName;
+      
+    const filename = `${baseName}.viewQ`;
+    const link = document.createElement('a');
+    link.href = base64DataUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    addLog('SUCCESS', `Archivo de evidencia encriptado .viewQ descargado: ${filename}`);
   };
 
   // Calculate timeline states based on real-time execution logs
@@ -289,12 +350,67 @@ export const Dashboard: React.FC = () => {
                     type="text"
                     required
                     value={destinatario}
-                    onChange={(e) => setDestinatario(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDestinatario(val);
+                      const match = registeredUsers.find(u => u.username.toLowerCase() === val.trim().toLowerCase());
+                      if (match) {
+                        setSelectedRecipientUsername(match.username);
+                      } else {
+                        setSelectedRecipientUsername('');
+                      }
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     placeholder={language === 'es' ? 'Ej. Fiscalía de Instrucción N° 4 o correo electrónico' : 'e.g. Prosecutor Office No. 4 or email'}
                     className="w-full text-xs font-sans pl-9 pr-3 py-2.5 border border-[#eaeaea] bg-white text-[#111111] focus:outline-none focus:border-black transition-all rounded-sm"
                     disabled={isRunning}
                     id="destinatario-input"
+                    autoComplete="off"
                   />
+                  
+                  {/* Suggestions Dropdown */}
+                  {showSuggestions && (destinatario.trim() ? registeredUsers.filter(u => {
+                    const query = destinatario.toLowerCase();
+                    const usernameMatch = u.username.toLowerCase().includes(query);
+                    const nameMatch = u.profile ? `${u.profile.nombres} ${u.profile.apellidos}`.toLowerCase().includes(query) : false;
+                    const emailMatch = u.profile?.email ? u.profile.email.toLowerCase().includes(query) : false;
+                    return usernameMatch || nameMatch || emailMatch;
+                  }) : []).length > 0 && (
+                    <div className="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto bg-white border border-[#eaeaea] rounded-sm shadow-md divide-y divide-gray-100">
+                      {(destinatario.trim() ? registeredUsers.filter(u => {
+                        const query = destinatario.toLowerCase();
+                        const usernameMatch = u.username.toLowerCase().includes(query);
+                        const nameMatch = u.profile ? `${u.profile.nombres} ${u.profile.apellidos}`.toLowerCase().includes(query) : false;
+                        const emailMatch = u.profile?.email ? u.profile.email.toLowerCase().includes(query) : false;
+                        return usernameMatch || nameMatch || emailMatch;
+                      }) : []).map((u) => {
+                        const displayName = u.profile ? `${u.profile.nombres} ${u.profile.apellidos}` : u.username;
+                        const roleAndJurisdiction = u.profile ? `${u.profile.matricula} - ${u.profile.jurisdiccion}` : '';
+                        return (
+                          <button
+                            key={u.username}
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-[#fafafa] flex flex-col transition-colors cursor-pointer"
+                            onClick={() => {
+                              setDestinatario(displayName);
+                              setSelectedRecipientUsername(u.username);
+                              setShowSuggestions(false);
+                            }}
+                          >
+                            <span className="text-xs font-bold text-gray-900 font-sans">
+                              {displayName} ({u.username})
+                            </span>
+                            {u.profile && (
+                              <span className="text-[10px] text-gray-400 font-sans">
+                                {u.profile.email} {roleAndJurisdiction ? `| ${roleAndJurisdiction}` : ''}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">
                   {language === 'es' ? 'Especifique el juzgado, fiscalía o perito receptor de esta evidencia confidencial.' : 'Specify the court, prosecutor, or expert recipient of this confidential evidence.'}
@@ -652,11 +768,22 @@ export const Dashboard: React.FC = () => {
               {vaults.some(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash && v.armoredFileBase64) && (
                 <button
                   onClick={downloadArmoredFile}
-                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-sm text-xs font-sans font-semibold transition-colors cursor-pointer animate-pulse"
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-sm text-xs font-sans font-semibold transition-colors cursor-pointer"
                   id="download-armored-btn"
                 >
                   <FileCheck2 size={13} />
                   {language === 'es' ? 'Descargar Evidencia Blindada' : 'Download Armored Evidence'}
+                </button>
+              )}
+
+              {vaults.some(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash && v.viewQFileBase64) && (
+                <button
+                  onClick={downloadViewQFile}
+                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-sm text-xs font-sans font-semibold transition-colors cursor-pointer animate-pulse"
+                  id="download-viewq-btn"
+                >
+                  <Lock size={13} />
+                  {language === 'es' ? 'Descargar Evidencia .viewQ' : 'Download .viewQ Evidence'}
                 </button>
               )}
             </div>
@@ -677,7 +804,7 @@ export const Dashboard: React.FC = () => {
             </div>
           ) : (
             /* Visual Breakdown Summary Cards */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" id="visual-breakdown-grid">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4" id="visual-breakdown-grid">
               
               {/* Card 1: Quantum Entropy Source */}
               <div className="bg-[#fafafa] border border-[#eaeaea] p-4 rounded-sm flex flex-col justify-between">
@@ -818,8 +945,144 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
 
+              {/* Card 6: Certified Forensic Expert / Perito */}
+              {manifestResult.certifiedBy && (
+                <div className="bg-[#fafafa] border border-l-2 border-l-emerald-600 border-[#eaeaea] p-4 rounded-sm flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-emerald-800 font-bold block mb-2">
+                      06. {language === 'es' ? 'FIRMANTE CERTIFICADO' : 'CERTIFIED SIGNER'}
+                    </span>
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-gray-950 truncate" title={`${manifestResult.certifiedBy.nombres} ${manifestResult.certifiedBy.apellidos}`}>
+                        {manifestResult.certifiedBy.nombres} {manifestResult.certifiedBy.apellidos}
+                      </p>
+                      <p className="text-[9px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-sm inline-block font-semibold">
+                        {manifestResult.certifiedBy.matricula}
+                      </p>
+                      <div className="flex justify-between text-[8px] font-mono text-gray-400 bg-white px-1.5 py-0.5 rounded-sm border border-gray-100 mt-1">
+                        <span>DNI:</span>
+                        <span className="text-black font-semibold">{manifestResult.certifiedBy.dni}</span>
+                      </div>
+                      <div className="flex justify-between text-[8px] font-mono text-gray-400 bg-white px-1.5 py-0.5 rounded-sm border border-gray-100">
+                        <span>Jurisdicción:</span>
+                        <span className="text-black font-semibold truncate max-w-[100px]" title={manifestResult.certifiedBy.jurisdiccion}>{manifestResult.certifiedBy.jurisdiccion}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[8px] text-gray-400 font-mono mt-3 pt-2 border-t border-gray-100 truncate" title={manifestResult.certifiedBy.email}>
+                    {manifestResult.certifiedBy.email}
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
+
+          {/* Delivery Instructions Panel */}
+          <div className="mt-6 pt-6 border-t border-[#eaeaea]" id="delivery-channels-panel">
+            <div className="flex items-center gap-2 mb-4">
+              <HelpCircle size={16} className="text-black" />
+              <h4 className="font-sans font-bold text-xs text-gray-900 uppercase tracking-wider">
+                {language === 'es' ? '¿Cómo recibe la evidencia el destinatario?' : 'How does the recipient receive the evidence?'}
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Channel A: Download & Manual send */}
+              <div className="bg-[#fafafa] border border-[#eaeaea] rounded-sm p-5 space-y-4 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded-sm bg-gray-200/50 text-gray-700">
+                      <Download size={13} />
+                    </span>
+                    <span className="font-sans font-bold text-[11px] text-[#111111] uppercase tracking-wide">
+                      {language === 'es' ? 'Vía A: Descarga y Entrega Manual' : 'Path A: Download & Manual Delivery'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed font-sans">
+                    {language === 'es' 
+                      ? 'Descargue el manifiesto de la custodia o el archivo de evidencia blindada. Puede enviarlo por cualquier canal seguro estándar (correo institucional, pendrive, o sistema pericial). El destinatario podrá subir el archivo en la pestaña "Verificador Forense" de su sistema para descifrarlo con su llave y auditar la cadena de custodia.' 
+                      : 'Download the custody manifest or armored evidence file. Send it via any standard secure channel (institutional email, secure drive, or forensic folders). The recipient can upload it to the "Forensic Verification" tab to decrypt with their key and audit the chain of custody.'}
+                  </p>
+                </div>
+                
+                <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={downloadManifestFile}
+                    className="flex-1 py-2 bg-white hover:bg-gray-50 text-gray-800 border border-[#eaeaea] text-[11px] font-sans font-bold uppercase tracking-wider transition-all rounded-sm cursor-pointer text-center"
+                  >
+                    {language === 'es' ? 'Descargar Manifiesto' : 'Download Manifest'}
+                  </button>
+                  {vaults.some(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash && v.armoredFileBase64) && (
+                    <button
+                      onClick={downloadArmoredFile}
+                      className="flex-1 py-2 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-sans font-bold uppercase tracking-wider transition-all rounded-sm cursor-pointer text-center"
+                    >
+                      {language === 'es' ? 'Descargar Blindado' : 'Download Armored'}
+                    </button>
+                  )}
+                  {vaults.some(v => v.manifest.payload.sha3Hash === manifestResult?.payload.sha3Hash && v.viewQFileBase64) && (
+                    <button
+                      onClick={downloadViewQFile}
+                      className="flex-1 py-2 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200 text-[11px] font-sans font-bold uppercase tracking-wider transition-all rounded-sm cursor-pointer text-center"
+                    >
+                      {language === 'es' ? 'Descargar .viewQ' : 'Download .viewQ'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Channel B: Instant Ephemeral Share */}
+              <div className="bg-[#fafafa] border border-[#eaeaea] rounded-sm p-5 space-y-4 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded-sm bg-black text-white">
+                      <Share2 size={13} />
+                    </span>
+                    <span className="font-sans font-bold text-[11px] text-[#111111] uppercase tracking-wide">
+                      {language === 'es' ? 'Vía B: Compartir Enlace Efímero al Instante' : 'Path B: Instant Ephemeral Link Share'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed font-sans">
+                    {language === 'es' 
+                      ? 'Genere un enlace de acceso único "Burn-after-Reading". Los datos se encriptan de forma local y se autodestruirán automáticamente tras la primera visualización del destinatario. Además, se registrará una captura forense inmutable de identidad y geolocalización en Stellar de quién abrió el enlace.' 
+                      : 'Generate a one-time "Burn-after-Reading" access link. Your files are encrypted locally and will automatically self-destruct upon the recipient\'s first opening. In addition, an immutable forensic fingerprint of access metadata will be notarized on Stellar.'}
+                  </p>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    if (!manifestResult) return;
+                    const filename = manifestResult.payload.originalFilename || 'evidencia_sellada.txt';
+                    const encryptedData = manifestResult.payload.encryptedData;
+                    const token = manifestResult.quantumSource.quantumSeed.substring(0, 16) || Math.random().toString(36).substring(2, 10);
+                    const iv = manifestResult.quantumSource.quantumSeed.substring(16, 28) || '0123456789ab';
+                    const aesKeyHex = manifestResult.cryptographicKeys.sharedSecretSs.substring(0, 32);
+
+                    const newShare = {
+                      token,
+                      filename,
+                      encryptedData,
+                      iv,
+                      aesKeyHex,
+                      createdAt: new Date().toISOString(),
+                      consumed: false
+                    };
+
+                    addEphemeralShare(newShare);
+                    addLog('SUCCESS', `Enlace efímero generado con éxito desde el Sello Cuántico. Redirigiendo a Enlaces Compartidos...`);
+                    setActiveTab('shares');
+                  }}
+                  className="w-full py-2 bg-black hover:bg-[#222222] text-white text-[11px] font-sans font-bold uppercase tracking-wider transition-all rounded-sm cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Send size={11} />
+                  <span>{language === 'es' ? 'Generar Enlace Compartido' : 'Generate Shared Link'}</span>
+                </button>
+              </div>
+
+            </div>
+          </div>
         </div>
       )}
     </div>

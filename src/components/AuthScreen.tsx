@@ -235,7 +235,7 @@ export const AuthScreen: React.FC = () => {
                 authMode === 'passkey' ? 'text-black border-b-2 border-black font-bold' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              {language === 'es' ? 'Huella / Rostro (Passkey)' : 'Fingerprint / Face (Passkey)'}
+              {language === 'es' ? 'Iniciar sesion' : 'Log In'}
             </button>
             <button
               onClick={() => { setAuthMode('diceware'); setLogs([]); }}
@@ -243,7 +243,7 @@ export const AuthScreen: React.FC = () => {
                 authMode === 'diceware' ? 'text-black border-b-2 border-black font-bold' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              {language === 'es' ? 'Frase de Seguridad (Diceware)' : 'Passphrase (Diceware)'}
+              {language === 'es' ? 'Crear cuenta' : 'Create Account'}
             </button>
           </div>
         )}
@@ -280,11 +280,6 @@ export const AuthScreen: React.FC = () => {
                       <Keyboard size={15} className={showKeyboard ? "text-black" : ""} />
                     </button>
                   </div>
-                  <p className="text-[11px] text-gray-500 leading-relaxed mt-1.5">
-                    {language === 'es' 
-                      ? 'Vincula el sensor de tu dispositivo (TouchID/FaceID) de forma segura y directa mediante criptografía cuántica.' 
-                      : 'Securely link your device physical scanner (TouchID/FaceID) directly with quantum cryptographic seeds.'}
-                  </p>
                 </div>
 
                 <button
@@ -292,7 +287,7 @@ export const AuthScreen: React.FC = () => {
                   className="w-full py-3 bg-black hover:bg-zinc-800 text-white text-xs font-sans font-medium uppercase tracking-wider rounded-sm transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
                 >
                   <Key size={14} />
-                  <span>{language === 'es' ? 'Acceder con mi Dispositivo' : 'Access with my Device'}</span>
+                  <span>{language === 'es' ? 'Acceder' : 'Access'}</span>
                 </button>
               </form>
             ) : (

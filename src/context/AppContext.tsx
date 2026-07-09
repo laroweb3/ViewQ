@@ -1,5 +1,51 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AppSettings, TerminalLog, VaultRecord, EphemeralShare } from '../types';
+import { AppSettings, TerminalLog, VaultRecord, EphemeralShare, UserProfile, RegisteredUser, AppNotification } from '../types';
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  getDoc 
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {}, // Custom authentication is used, not Firebase Auth
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 interface AppContextType {
   settings: AppSettings;
@@ -12,13 +58,19 @@ interface AppContextType {
   clearLogs: () => void;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
-  activeTab: 'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify';
-  setActiveTab: (tab: 'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify') => void;
+  activeTab: 'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify' | 'wiki' | 'users' | 'notifications';
+  setActiveTab: (tab: 'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify' | 'wiki' | 'users' | 'notifications') => void;
   
   // User Authentication State
-  user: { username: string; authType: 'passkey' | 'diceware' } | null;
+  user: { username: string; authType: 'passkey' | 'diceware'; status: 'pending' | 'approved' | 'rejected'; profile?: UserProfile } | null;
   login: (username: string, authType: 'passkey' | 'diceware') => void;
   logout: () => void;
+  updateUserProfile: (profile: UserProfile) => void;
+  
+  // User Approvals
+  registeredUsers: RegisteredUser[];
+  approveUser: (username: string) => void;
+  rejectUser: (username: string) => void;
   
   // Ephemeral Shares State
   ephemeralShares: EphemeralShare[];
@@ -29,6 +81,10 @@ interface AppContextType {
   // Language State
   language: 'es' | 'en';
   setLanguage: (lang: 'es' | 'en') => void;
+
+  // Notifications
+  notifications: AppNotification[];
+  markNotificationAsRead: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -82,12 +138,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return [];
   });
 
-  // 4. Initialize user from localStorage
-  const [user, setUser] = useState<{ username: string; authType: 'passkey' | 'diceware' } | null>(() => {
-    const saved = localStorage.getItem('quantum_pqc_user');
+  // 3b. Initialize registeredUsers from localStorage
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>(() => {
+    const saved = localStorage.getItem('quantum_pqc_registered_users');
     if (saved) {
       try {
         return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [
+      {
+        username: 'Laro',
+        authType: 'passkey',
+        status: 'approved',
+        registeredAt: new Date().toISOString()
+      }
+    ];
+  });
+
+  // 4. Initialize user from localStorage
+  const [user, setUser] = useState<{ username: string; authType: 'passkey' | 'diceware'; status: 'pending' | 'approved' | 'rejected'; profile?: UserProfile } | null>(() => {
+    const saved = localStorage.getItem('quantum_pqc_user');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const savedUsersRaw = localStorage.getItem('quantum_pqc_registered_users');
+        if (savedUsersRaw) {
+          const list = JSON.parse(savedUsersRaw) as RegisteredUser[];
+          const match = list.find(u => u.username.toLowerCase() === parsed.username.toLowerCase());
+          if (match) {
+            return {
+              ...parsed,
+              status: match.status,
+              profile: match.profile || parsed.profile
+            };
+          }
+        }
+        return parsed;
       } catch (e) {
         return null;
       }
@@ -97,8 +186,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 5. Initialize active states
   const [logs, setLogs] = useState<TerminalLog[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify'>('transmission');
+  const [activeTab, setActiveTab] = useState<'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify' | 'wiki' | 'users' | 'notifications'>('transmission');
 
   // Initialize language from localStorage (defaults to 'es')
   const [language, setLanguageState] = useState<'es' | 'en'>(() => {
@@ -111,17 +201,142 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('quantum_pqc_language', lang);
   };
 
-  // Sync vaults to localStorage when modified
-  useEffect(() => {
-    localStorage.setItem('quantum_pqc_vaults', JSON.stringify(vaults));
-  }, [vaults]);
+  // Real-time Firestore Listeners
 
-  // Sync ephemeral shares to localStorage
+  // 1. Listen to vaults collection
   useEffect(() => {
-    localStorage.setItem('quantum_pqc_shares', JSON.stringify(ephemeralShares));
-  }, [ephemeralShares]);
+    const unsubscribe = onSnapshot(collection(db, 'vaults'), (snapshot) => {
+      const list: VaultRecord[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data() as VaultRecord;
+        
+        // Hydrate from localStorage if it was saved locally due to size constraints
+        if (data.armoredFileBase64 && data.armoredFileBase64.startsWith('local_only:')) {
+          const localArmored = localStorage.getItem(`local_vault_armored_${data.id}`);
+          if (localArmored) {
+            data.armoredFileBase64 = localArmored;
+          }
+        }
+        
+        if (data.viewQFileBase64 && data.viewQFileBase64.startsWith('local_only:')) {
+          const localViewQ = localStorage.getItem(`local_vault_viewq_${data.id}`);
+          if (localViewQ) {
+            data.viewQFileBase64 = localViewQ;
+          }
+        }
 
-  // Sync user to localStorage
+        list.push(data);
+      });
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setVaults(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'vaults');
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Listen to shares collection
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'shares'), (snapshot) => {
+      const list: EphemeralShare[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data() as EphemeralShare);
+      });
+      setEphemeralShares(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'shares');
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 3. Listen to users collection
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const list: RegisteredUser[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data() as RegisteredUser);
+      });
+      
+      // If "laro" is missing in the database, insert it
+      const laroExists = list.some(u => u.username.toLowerCase() === 'laro');
+      if (!laroExists) {
+        const defaultLaro: RegisteredUser = {
+          username: 'Laro',
+          authType: 'passkey',
+          status: 'approved',
+          registeredAt: new Date().toISOString()
+        };
+        setDoc(doc(db, 'users', 'laro'), defaultLaro).catch((err) => {
+          handleFirestoreError(err, OperationType.WRITE, 'users/laro');
+        });
+        list.push(defaultLaro);
+      }
+      setRegisteredUsers(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'users');
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 4. Listen to logs collection
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'logs'), (snapshot) => {
+      const list: TerminalLog[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data() as TerminalLog);
+      });
+      list.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      setLogs(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'logs');
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 4b. Listen to notifications collection
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+    const unsubscribe = onSnapshot(collection(db, 'notifications'), (snapshot) => {
+      const list: AppNotification[] = [];
+      snapshot.forEach((docSnap) => {
+        const notif = docSnap.data() as AppNotification;
+        if (notif.recipientUsername === user.username.toLowerCase()) {
+          list.push(notif);
+        }
+      });
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setNotifications(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'notifications');
+    });
+    return () => unsubscribe();
+  }, [user?.username]);
+
+  // 5. Listen to logged-in user changes (status, profile) dynamically from firestore
+  useEffect(() => {
+    if (!user) return;
+    const path = `users/${user.username.toLowerCase()}`;
+    const unsubscribe = onSnapshot(doc(db, 'users', user.username.toLowerCase()), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as RegisteredUser;
+        if (data.status !== user.status || JSON.stringify(data.profile) !== JSON.stringify(user.profile)) {
+          setUser(prev => prev ? {
+            ...prev,
+            status: data.status,
+            profile: data.profile || prev.profile
+          } : null);
+        }
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, path);
+    });
+    return () => unsubscribe();
+  }, [user?.username]);
+
+  // Keep user session in localStorage so they stay logged in on refresh
   useEffect(() => {
     if (user) {
       localStorage.setItem('quantum_pqc_user', JSON.stringify(user));
@@ -133,36 +348,193 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
     localStorage.setItem('quantum_pqc_settings', JSON.stringify(newSettings));
+    if (user) {
+      setDoc(doc(db, 'settings', user.username.toLowerCase()), newSettings).catch((err) => {
+        handleFirestoreError(err, OperationType.WRITE, `settings/${user.username.toLowerCase()}`);
+      });
+    }
   };
 
   const addVault = (record: VaultRecord) => {
-    setVaults(prev => [record, ...prev]);
+    // Clone the record to avoid mutating the live state directly
+    const recordForCloud = { ...record };
+    
+    // Check if armoredFileBase64 is large
+    if (record.armoredFileBase64) {
+      if (record.armoredFileBase64.length > 500000) {
+        try {
+          localStorage.setItem(`local_vault_armored_${record.id}`, record.armoredFileBase64);
+        } catch (e) {
+          console.warn("localStorage quota exceeded for armored file:", e);
+        }
+        recordForCloud.armoredFileBase64 = `local_only:${record.id}`;
+      }
+    }
+    
+    // Check if viewQFileBase64 is large
+    if (record.viewQFileBase64) {
+      if (record.viewQFileBase64.length > 500000) {
+        try {
+          localStorage.setItem(`local_vault_viewq_${record.id}`, record.viewQFileBase64);
+        } catch (e) {
+          console.warn("localStorage quota exceeded for viewQ file:", e);
+        }
+        recordForCloud.viewQFileBase64 = `local_only:${record.id}`;
+      }
+    }
+
+    setDoc(doc(db, 'vaults', recordForCloud.id), recordForCloud).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `vaults/${record.id}`);
+    });
+
+    // Create a real notification if recipientUsername matches any registered users (case-insensitive)
+    if (record.recipientUsername) {
+      const targetUser = record.recipientUsername.toLowerCase();
+      const notifId = `notif_${Math.random().toString(36).substr(2, 9)}`;
+      const newNotif: AppNotification = {
+        id: notifId,
+        sender: user?.username || 'Anónimo',
+        senderProfile: user?.profile || undefined,
+        recipientUsername: targetUser,
+        timestamp: new Date().toISOString(),
+        vaultId: record.id,
+        title: record.title,
+        notes: record.notes || '',
+        originalFilename: record.manifest.payload.originalFilename,
+        sha3Hash: record.manifest.payload.sha3Hash,
+        status: 'unread',
+        stellarTxHash: record.manifest.stellarNotarization?.txHash,
+        ledger: record.manifest.stellarNotarization?.ledger
+      };
+
+      setDoc(doc(db, 'notifications', notifId), newNotif).catch((err) => {
+        handleFirestoreError(err, OperationType.WRITE, `notifications/${notifId}`);
+      });
+    }
+  };
+
+  const markNotificationAsRead = (id: string) => {
+    setDoc(doc(db, 'notifications', id), { status: 'read' }, { merge: true }).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `notifications/${id}`);
+    });
   };
 
   const deleteVault = (id: string) => {
-    setVaults(prev => prev.filter(v => v.id !== id));
+    localStorage.removeItem(`local_vault_armored_${id}`);
+    localStorage.removeItem(`local_vault_viewq_${id}`);
+    deleteDoc(doc(db, 'vaults', id)).catch((err) => {
+      handleFirestoreError(err, OperationType.DELETE, `vaults/${id}`);
+    });
   };
 
   const addEphemeralShare = (share: EphemeralShare) => {
-    setEphemeralShares(prev => [share, ...prev]);
+    setDoc(doc(db, 'shares', share.token), share).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `shares/${share.token}`);
+    });
   };
 
   const updateEphemeralShare = (updated: EphemeralShare) => {
-    setEphemeralShares(prev => prev.map(s => s.token === updated.token ? updated : s));
+    setDoc(doc(db, 'shares', updated.token), updated).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `shares/${updated.token}`);
+    });
   };
 
   const deleteEphemeralShare = (token: string) => {
-    setEphemeralShares(prev => prev.filter(s => s.token !== token));
+    deleteDoc(doc(db, 'shares', token)).catch((err) => {
+      handleFirestoreError(err, OperationType.DELETE, `shares/${token}`);
+    });
   };
 
-  const login = (username: string, authType: 'passkey' | 'diceware') => {
-    setUser({ username, authType });
-    addLog('SUCCESS', `AUTENTICACIÓN EXITOSA: Sesión iniciada para ${username.toUpperCase()} mediante ${authType === 'passkey' ? 'PASSKEY BIOMÉTRICO CUÁNTICO' : 'DICEWARE CUÁNTICO'}`);
+  const login = async (username: string, authType: 'passkey' | 'diceware') => {
+    const normalizedUsername = username.trim().toLowerCase();
+    const userDocRef = doc(db, 'users', normalizedUsername);
+    let existingUser: RegisteredUser | null = null;
+    
+    try {
+      const docSnap = await getDoc(userDocRef);
+      if (docSnap.exists()) {
+        existingUser = docSnap.data() as RegisteredUser;
+      }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.GET, `users/${normalizedUsername}`);
+    }
+
+    let status: 'pending' | 'approved' | 'rejected' = 'pending';
+    let profile: UserProfile | undefined = undefined;
+
+    if (normalizedUsername === 'laro') {
+      status = 'approved';
+    }
+
+    if (existingUser) {
+      status = existingUser.status;
+      profile = existingUser.profile;
+    } else {
+      // Create new user registration entry in cloud
+      const newUser: RegisteredUser = {
+        username: username,
+        authType,
+        status,
+        registeredAt: new Date().toISOString()
+      };
+      if (profile !== undefined) {
+        newUser.profile = profile;
+      }
+      setDoc(userDocRef, newUser).catch((err) => {
+        handleFirestoreError(err, OperationType.WRITE, `users/${normalizedUsername}`);
+      });
+    }
+
+    setUser({ username, authType, status, profile });
+    addLog('SUCCESS', `AUTENTICACIÓN EXITOSA: Sesión iniciada para ${username.toUpperCase()} mediante ${authType === 'passkey' ? 'PASSKEY BIOMÉTRICO' : 'CREACIÓN DE CUENTA DICEWARE'}`);
   };
 
   const logout = () => {
     setUser(null);
     addLog('INFO', 'Sesión de fiscalía cerrada correctamente.');
+  };
+
+  const updateUserProfile = (profile: UserProfile) => {
+    if (!user) return;
+    setUser(prev => prev ? { ...prev, profile } : null);
+    
+    const userDocData: any = {
+      username: user.username,
+      authType: user.authType,
+      status: user.status,
+      registeredAt: new Date().toISOString()
+    };
+    if (profile !== undefined) {
+      userDocData.profile = profile;
+    }
+
+    setDoc(doc(db, 'users', user.username.toLowerCase()), userDocData, { merge: true }).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `users/${user.username.toLowerCase()}`);
+    });
+
+    addLog('SUCCESS', `PERFIL ACTUALIZADO: Los datos de identificación del Perito/Fiscal (${profile.nombres} ${profile.apellidos}) han sido vinculados a la sesión.`);
+  };
+
+  const approveUser = (username: string) => {
+    setDoc(doc(db, 'users', username.toLowerCase()), { status: 'approved' }, { merge: true }).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `users/${username.toLowerCase()}`);
+    });
+    
+    if (user && user.username.toLowerCase() === username.toLowerCase()) {
+      setUser(prev => prev ? { ...prev, status: 'approved' } : null);
+    }
+    addLog('SUCCESS', `REGISTRO APROBADO: El usuario ${username.toUpperCase()} ha sido aprobado por el superadmin.`);
+  };
+
+  const rejectUser = (username: string) => {
+    setDoc(doc(db, 'users', username.toLowerCase()), { status: 'rejected' }, { merge: true }).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `users/${username.toLowerCase()}`);
+    });
+
+    if (user && user.username.toLowerCase() === username.toLowerCase()) {
+      setUser(prev => prev ? { ...prev, status: 'rejected' } : null);
+    }
+    addLog('SUCCESS', `REGISTRO RECHAZADO: El usuario ${username.toUpperCase()} ha sido rechazado por el superadmin.`);
   };
 
   const addLog = (level: TerminalLog['level'], message: string) => {
@@ -174,114 +546,128 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       second: '2-digit',
     }) + `.${String(new Date().getMilliseconds()).padStart(3, '0')}`;
     
-    setLogs(prev => [...prev, { id, timestamp, level, message }]);
+    const newLog: TerminalLog = { id, timestamp, level, message };
+    setLogs(prev => [...prev, newLog]);
+    setDoc(doc(db, 'logs', id), newLog).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `logs/${id}`);
+    });
   };
 
   const clearLogs = () => {
+    // Delete all logs from cloud
+    logs.forEach(log => {
+      deleteDoc(doc(db, 'logs', log.id)).catch((err) => {
+        handleFirestoreError(err, OperationType.DELETE, `logs/${log.id}`);
+      });
+    });
     setLogs([]);
   };
 
-  // Pre-populate demo data if empty
+  // Pre-populate demo data in cloud if empty
   useEffect(() => {
-    if (vaults.length === 0) {
-      const initializeDemo = async () => {
-        const demoMessage = 'Este es un expediente de prueba judicial consolidado bajo el estándar NIST ML-KEM-768 y anclado en Stellar.';
-        const sharedSecretSs = 'f9d8a7c6b5e4d3c2b1a09f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c';
-        const ivHex = 'd4e5f60718293a4b5c6d7e8f';
-        
-        let encryptedData = 'ca712b3f1a0e9d28c3b7a5e9a0c1e4c2b8a7190a2c3b88aa091fcf3177bb9c'; // Fallback
-        
-        try {
-          // Import raw sharedSecretSs bytes for encryption
-          const cleanHex = sharedSecretSs;
-          const keyBytes = new Uint8Array(cleanHex.length / 2);
-          for (let i = 0; i < keyBytes.length; i++) {
-            keyBytes[i] = parseInt(cleanHex.substring(i * 2, i * 2 + 2), 16);
-          }
-          
-          const cryptoKey = await window.crypto.subtle.importKey(
-            'raw',
-            keyBytes,
-            { name: 'AES-GCM' },
-            false,
-            ['encrypt']
-          );
-          
-          const ivBytes = new Uint8Array(ivHex.length / 2);
-          for (let i = 0; i < ivBytes.length; i++) {
-            ivBytes[i] = parseInt(ivHex.substring(i * 2, i * 2 + 2), 16);
-          }
-          
-          const textEncoder = new TextEncoder();
-          const plaintextBytes = textEncoder.encode(demoMessage);
-          
-          const encryptedBuffer = await window.crypto.subtle.encrypt(
-            {
-              name: 'AES-GCM',
-              iv: ivBytes,
-            },
-            cryptoKey,
-            plaintextBytes
-          );
-          
-          const encryptedBytes = new Uint8Array(encryptedBuffer);
-          encryptedData = Array.from(encryptedBytes)
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-        } catch (e) {
-          console.error('Failed to pre-encrypt demo message', e);
-        }
+    const initializeDemo = async () => {
+      if (vaults.length > 0) return;
 
-        const demoRecord: VaultRecord = {
-          id: 'vault-demo-1',
-          title: 'Expediente Confidencial de Prueba - NIST-Kyber-768',
+      const demoMessage = 'Este es un expediente de prueba judicial consolidado bajo el estándar NIST ML-KEM-768 y anclado en Stellar.';
+      const sharedSecretSs = 'f9d8a7c6b5e4d3c2b1a09f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c';
+      const ivHex = 'd4e5f60718293a4b5c6d7e8f';
+      
+      let encryptedData = 'ca712b3f1a0e9d28c3b7a5e9a0c1e4c2b8a7190a2c3b88aa091fcf3177bb9c'; // Fallback
+      
+      try {
+        // Import raw sharedSecretSs bytes for encryption
+        const cleanHex = sharedSecretSs;
+        const keyBytes = new Uint8Array(cleanHex.length / 2);
+        for (let i = 0; i < keyBytes.length; i++) {
+          keyBytes[i] = parseInt(cleanHex.substring(i * 2, i * 2 + 2), 16);
+        }
+        
+        const cryptoKey = await window.crypto.subtle.importKey(
+          'raw',
+          keyBytes,
+          { name: 'AES-GCM' },
+          false,
+          ['encrypt']
+        );
+        
+        const ivBytes = new Uint8Array(ivHex.length / 2);
+        for (let i = 0; i < ivBytes.length; i++) {
+          ivBytes[i] = parseInt(ivHex.substring(i * 2, i * 2 + 2), 16);
+        }
+        
+        const textEncoder = new TextEncoder();
+        const plaintextBytes = textEncoder.encode(demoMessage);
+        
+        const encryptedBuffer = await window.crypto.subtle.encrypt(
+          {
+            name: 'AES-GCM',
+            iv: ivBytes,
+          },
+          cryptoKey,
+          plaintextBytes
+        );
+        
+        const encryptedBytes = new Uint8Array(encryptedBuffer);
+        encryptedData = Array.from(encryptedBytes)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+      } catch (e) {
+        console.error('Failed to pre-encrypt demo message', e);
+      }
+
+      const demoRecord: VaultRecord = {
+        id: 'vault-demo-1',
+        title: 'Expediente Confidencial de Prueba - NIST-Kyber-768',
+        timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
+        notes: 'Sellado de prueba inicial ejecutado con entropía cuántica de simulación.',
+        manifest: {
+          version: '1.0.0',
           timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-          notes: 'Sellado de prueba inicial ejecutado con entropía cuántica de simulación.',
-          manifest: {
-            version: '1.0.0',
-            timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-            algorithm: {
-              kem: 'NIST ML-KEM-768 (Kyber)',
-              symmetric: 'AES-256-GCM',
-              hash: 'SHA3-256',
-            },
-            parameters: {
-              k: 3,
-              q: 3329,
-              eta1: 2,
-            },
-            quantumSource: {
-              provider: 'IonQ QRNG Core v0.3',
-              target: 'ionq.simulator',
-              jobId: 'demo-job-quantum-entropy-7711-20a8',
-              isSimulated: true,
-              quantumSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9001122334455667788990aabbccddeeff',
-            },
-            cryptographicKeys: {
-              encapsulationKeyEk: 'EK_MLKEM768_t0:8aef31c4f909187319bc83a2139871fc_t1:1c83a2139871fc8aef31c4f909187319_t2:aef31c4f909187319bc83a2139871fc1_seedA:9c83a2139871fc8a',
-              decapsulationKeyDk: 'DK_MLKEM768_s0:09187319bc83a2139871fc8aef31c4f9_s1:bc83a2139871fc8aef31c4f909187319_s2:8aef31c4f909187319bc83a2139871fc1',
-              ciphertextCt: 'CT_MLKEM768_u0:9871fc8aef31c4f909187319_u1:c4f909187319bc83a2139871fc8_u2:aef31c4f909187319bc83a21_v:bc83a2139871fc8aef31c4f909187319bc8',
-              sharedSecretSs: sharedSecretSs,
-            },
-            payload: {
-              originalFilename: 'manifesto_judicial.txt',
-              sha3Hash: 'a571f3918a0918a2bc83a2139871fc8aef31c4f909187319bc83a2139871fca4',
-              iv: ivHex,
-              encryptedData: encryptedData,
-            },
+          algorithm: {
+            kem: 'NIST ML-KEM-768 (Kyber)',
+            symmetric: 'AES-256-GCM',
+            hash: 'SHA3-256',
           },
-          stellarNotarization: {
-            txHash: 'a87ff9871fcaef31c4f909187319bc83a2139871fc8aef31c4f909187319abcd',
-            ledger: 50921820,
-            network: 'testnet',
-            timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-            memo: 'SHA3:a571f3918a0918a2bc83...a4',
+          parameters: {
+            k: 3,
+            q: 3329,
+            eta1: 2,
           },
-        };
-        setVaults([demoRecord]);
+          quantumSource: {
+            provider: 'IonQ QRNG Core v0.3',
+            target: 'ionq.simulator',
+            jobId: 'demo-job-quantum-entropy-7711-20a8',
+            isSimulated: true,
+            quantumSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9001122334455667788990aabbccddeeff',
+          },
+          cryptographicKeys: {
+            encapsulationKeyEk: 'EK_MLKEM768_t0:8aef31c4f909187319bc83a2139871fc_t1:1c83a2139871fc8aef31c4f909187319_t2:aef31c4f909187319bc83a2139871fc1_seedA:9c83a2139871fc8a',
+            decapsulationKeyDk: 'DK_MLKEM768_s0:09187319bc83a2139871fc8aef31c4f9_s1:bc83a2139871fc8aef31c4f909187319_s2:8aef31c4f909187319bc83a2139871fc1',
+            ciphertextCt: 'CT_MLKEM768_u0:9871fc8aef31c4f909187319_u1:c4f909187319bc83a2139871fc8_u2:aef31c4f909187319bc83a21_v:bc83a2139871fc8aef31c4f909187319bc8',
+            sharedSecretSs: sharedSecretSs,
+          },
+          payload: {
+            originalFilename: 'manifesto_judicial.txt',
+            sha3Hash: 'a571f3918a0918a2bc83a2139871fc8aef31c4f909187319bc83a2139871fca4',
+            iv: ivHex,
+            encryptedData: encryptedData,
+          },
+        },
+        stellarNotarization: {
+          txHash: 'a87ff9871fcaef31c4f909187319bc83a2139871fc8aef31c4f909187319abcd',
+          ledger: 50921820,
+          network: 'testnet',
+          timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
+          memo: 'SHA3:a571f3918a0918a2bc83...a4',
+        },
       };
-      initializeDemo();
-    }
+
+      setDoc(doc(db, 'vaults', demoRecord.id), demoRecord).catch((err) => {
+        handleFirestoreError(err, OperationType.WRITE, `vaults/${demoRecord.id}`);
+      });
+    };
+
+    initializeDemo();
   }, [vaults]);
 
   return (
@@ -302,12 +688,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user,
         login,
         logout,
+        updateUserProfile,
+        registeredUsers,
+        approveUser,
+        rejectUser,
         ephemeralShares,
         addEphemeralShare,
         updateEphemeralShare,
         deleteEphemeralShare,
         language,
         setLanguage,
+        notifications,
+        markNotificationAsRead,
       }}
     >
       {children}

@@ -1,0 +1,120 @@
+{
+  "entities": {
+    "RegisteredUser": {
+      "title": "RegisteredUser",
+      "description": "Information about a registered forensic user",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "authType": { "type": "string", "enum": ["passkey", "diceware"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "profile": { "type": "object" },
+        "registeredAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["username", "authType", "status", "registeredAt"]
+    },
+    "VaultRecord": {
+      "title": "VaultRecord",
+      "description": "Forensic proof manifest and sealed data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "manifest": { "type": "object" },
+        "notes": { "type": "string" },
+        "stellarNotarization": { "type": "object" },
+        "armoredFileBase64": { "type": "string" }
+      },
+      "required": ["id", "title", "timestamp", "manifest"]
+    },
+    "EphemeralShare": {
+      "title": "EphemeralShare",
+      "description": "An ephemeral key-exchange and proof share link",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" },
+        "filename": { "type": "string" },
+        "encryptedData": { "type": "string" },
+        "iv": { "type": "string" },
+        "aesKeyHex": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "consumed": { "type": "boolean" },
+        "consumedBy": { "type": "object" }
+      },
+      "required": ["token", "filename", "encryptedData", "iv", "aesKeyHex", "createdAt", "consumed"]
+    },
+    "TerminalLog": {
+      "title": "TerminalLog",
+      "description": "A terminal logging action for auditability",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "level": { "type": "string", "enum": ["INFO", "WARN", "SUCCESS", "ERROR", "SYSTEM"] },
+        "message": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "level", "message"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "System or user configuration parameters",
+      "type": "object",
+      "properties": {
+        "ionqApiToken": { "type": "string" },
+        "target": { "type": "string" },
+        "apiProxyBaseUrl": { "type": "string" },
+        "stellarSourceSecret": { "type": "string" },
+        "stellarNetwork": { "type": "string" }
+      },
+      "required": ["ionqApiToken", "target", "apiProxyBaseUrl", "stellarSourceSecret", "stellarNetwork"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "Notification sent to a forensic user regarding shared custody records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sender": { "type": "string" },
+        "senderProfile": { "type": "object" },
+        "recipientUsername": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "vaultId": { "type": "string" },
+        "title": { "type": "string" },
+        "notes": { "type": "string" },
+        "originalFilename": { "type": "string" },
+        "sha3Hash": { "type": "string" },
+        "status": { "type": "string", "enum": ["unread", "read"] },
+        "stellarTxHash": { "type": "string" },
+        "ledger": { "type": "integer" }
+      },
+      "required": ["id", "sender", "recipientUsername", "timestamp", "vaultId", "title", "sha3Hash", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{username}": {
+      "schema": { "$ref": "#/entities/RegisteredUser" },
+      "description": "Collection of registered users"
+    },
+    "/vaults/{vaultId}": {
+      "schema": { "$ref": "#/entities/VaultRecord" },
+      "description": "Collection of PQC-sealed forensic vault proof manifests"
+    },
+    "/shares/{token}": {
+      "schema": { "$ref": "#/entities/EphemeralShare" },
+      "description": "Collection of ephemeral digital shares"
+    },
+    "/logs/{logId}": {
+      "schema": { "$ref": "#/entities/TerminalLog" },
+      "description": "Collection of terminal / audit logs"
+    },
+    "/settings/{username}": {
+      "schema": { "$ref": "#/entities/AppSettings" },
+      "description": "Collection of user configurations"
+    },
+    "/notifications/{notifId}": {
+      "schema": { "$ref": "#/entities/AppNotification" },
+      "description": "Collection of forensic custody notifications"
+    }
+  }
+}

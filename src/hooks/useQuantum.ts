@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { sealPayload } from '../lib/pqc';
 import { SealingManifest, VaultRecord, StellarNotarization } from '../types';
 import { injectMetadata } from '../lib/metadataInjector';
+import { packViewQ } from '../lib/viewq';
 import * as sha3Module from 'js-sha3';
 import { Keypair, Horizon, TransactionBuilder, Networks, Memo, Operation, Asset } from '@stellar/stellar-sdk';
 import { Buffer } from 'buffer';
@@ -25,7 +26,7 @@ const hexToUint8Array = (hex: string): Uint8Array => {
 };
 
 export function useQuantum() {
-  const { settings, addLog, clearLogs, addVault } = useApp();
+  const { settings, addLog, clearLogs, addVault, user } = useApp();
   const [isRunning, setIsRunning] = useState(false);
   const [manifestResult, setManifestResult] = useState<SealingManifest | null>(null);
 
@@ -33,7 +34,9 @@ export function useQuantum() {
     message: string,
     title: string,
     filename?: string,
-    notes?: string
+    notes?: string,
+    destinatario?: string,
+    recipientUsername?: string
   ): Promise<SealingManifest | null> => {
     if (!message) {
       addLog('ERROR', 'El mensaje o archivo a sellar no puede estar vacío.');
@@ -391,6 +394,11 @@ export function useQuantum() {
       // Save to history / vaults
       manifest.stellarNotarization = stellarNotarizationObj;
 
+      if (user && user.profile) {
+        manifest.certifiedBy = user.profile;
+        addLog('SUCCESS', `Firma Oficial Certificada: Sello asignado al perito ${user.profile.nombres} ${user.profile.apellidos} (Matrícula: ${user.profile.matricula}, Jurisdicción: ${user.profile.jurisdiccion})`);
+      }
+
       // 3. LA INYECCIÓN (Metadata Injection Phase)
       addLog('INFO', 'Iniciando Fase 3: Inyección Invisible de Metadatos Cuánticos...');
       await delay(600);
@@ -443,6 +451,49 @@ export function useQuantum() {
         addLog('WARN', `Inyección de metadatos fallida: ${err.message || err}. Continuando sin archivo blindado.`);
       }
 
+      // 3.1 VIEWQ FILE GENERATION
+      let viewQFileBase64 = '';
+      try {
+        addLog('INFO', `Generando archivo encriptado .viewQ con extensión encapsulada...`);
+        // We get the encrypted payload as hex from the manifest
+        const encHex = manifest.payload.encryptedData;
+        
+        // Convert hex to bytes
+        const encBytes = new Uint8Array(encHex.length / 2);
+        for (let i = 0; i < encBytes.length; i++) {
+          encBytes[i] = parseInt(encHex.substring(i * 2, i * 2 + 2), 16);
+        }
+        
+        const fileExt = actualFilename.includes('.') 
+          ? actualFilename.substring(actualFilename.lastIndexOf('.')) 
+          : '.txt';
+          
+        const viewQHeader = {
+          originalFilename: actualFilename,
+          extension: fileExt,
+          stellarTx: finalTxHash,
+          ionqJobId: finalJobId,
+          iv: manifest.payload.iv,
+          sha3Hash: sha3Hash,
+          manifest: manifest
+        };
+        
+        const viewQBytes = packViewQ(encBytes, viewQHeader);
+        
+        // Convert viewQ bytes to Base64 data URL
+        let binaryString = '';
+        const len = viewQBytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binaryString += String.fromCharCode(viewQBytes[i]);
+        }
+        const viewQBase64 = btoa(binaryString);
+        viewQFileBase64 = `data:application/octet-stream;base64,${viewQBase64}`;
+        
+        addLog('SUCCESS', `¡Archivo .viewQ generado exitosamente! El contenido quedó completamente "deformado" bajo cifrado de grado militar.`);
+      } catch (err: any) {
+        addLog('WARN', `Generación de archivo .viewQ fallida: ${err.message || err}`);
+      }
+
       const newVault: VaultRecord = {
         id: `vault_${Math.random().toString(36).substr(2, 9)}`,
         title: title || (filename ? `Archivo: ${filename}` : 'Mensaje Sellado'),
@@ -450,7 +501,10 @@ export function useQuantum() {
         notes: notes || 'Ninguna observación adicional.',
         manifest: manifest,
         stellarNotarization: stellarNotarizationObj,
-        armoredFileBase64: armoredFileBase64 || undefined
+        armoredFileBase64: armoredFileBase64 || undefined,
+        viewQFileBase64: viewQFileBase64 || undefined,
+        destinatario,
+        recipientUsername
       };
 
       addVault(newVault);

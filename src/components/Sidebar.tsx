@@ -13,7 +13,10 @@ import {
   Link2,
   LogOut,
   UserCheck,
-  FileSearch
+  FileSearch,
+  HelpCircle,
+  Users,
+  Bell
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -25,8 +28,13 @@ export const Sidebar: React.FC = () => {
     user,
     logout,
     language,
-    setLanguage
+    setLanguage,
+    notifications
   } = useApp();
+
+  const unreadCount = notifications.filter(n => n.status === 'unread').length;
+
+  const isLaro = user?.username.toLowerCase() === 'laro';
 
   const navItems = [
     {
@@ -48,18 +56,38 @@ export const Sidebar: React.FC = () => {
       desc: language === 'es' ? 'Auditar firma y metadatos' : 'Audit signature & metadata',
     },
     {
+      id: 'notifications',
+      label: language === 'es' ? 'Notificaciones' : 'Notifications',
+      icon: Bell,
+      desc: language === 'es' ? 'Alertas de evidencia recibida' : 'Received evidence alerts',
+    },
+    {
       id: 'shares',
       label: language === 'es' ? 'Enlaces Compartidos' : 'Shared Links',
       icon: Link2,
       desc: language === 'es' ? 'Control de accesos efímeros' : 'Ephemeral access control',
     },
-    {
-      id: 'settings',
-      label: language === 'es' ? 'Configuración del Sistema' : 'System Settings',
-      icon: Sliders,
-      desc: language === 'es' ? 'Configuración técnica' : 'Technical configuration',
-    },
-  ] as const;
+    ...(isLaro ? [
+      {
+        id: 'users' as const,
+        label: language === 'es' ? 'Control de Usuarios' : 'User Control',
+        icon: Users,
+        desc: language === 'es' ? 'Aprobar o rechazar registros' : 'Approve or reject users',
+      },
+      {
+        id: 'settings' as const,
+        label: language === 'es' ? 'Configuración del Sistema' : 'System Settings',
+        icon: Sliders,
+        desc: language === 'es' ? 'Configuración técnica' : 'Technical configuration',
+      }
+    ] : []),
+     {
+       id: 'wiki',
+       label: language === 'es' ? 'Preguntas Frecuentes (Wiki)' : 'FAQs & Wiki',
+       icon: HelpCircle,
+       desc: language === 'es' ? 'Cómo funciona y seguridad' : 'How it works & security',
+     },
+   ];
 
 
   return (
@@ -161,6 +189,13 @@ export const Sidebar: React.FC = () => {
                       {item.desc}
                     </span>
                   </div>
+                )}
+
+                {/* Notification Badge */}
+                {item.id === 'notifications' && unreadCount > 0 && (
+                  <span className={`absolute ${sidebarOpen ? 'right-3 top-1/2 -translate-y-1/2' : 'top-1.5 right-1.5'} bg-red-500 text-white text-[9px] font-sans font-bold w-4.5 h-4.5 rounded-full flex items-center justify-center animate-pulse`}>
+                    {unreadCount}
+                  </span>
                 )}
 
                 {/* Micro tooltip for collapsed state */}

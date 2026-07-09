@@ -274,6 +274,12 @@ export const HistoryView: React.FC = () => {
                   {selectedVault.armoredFileBase64 && (
                     <button
                       onClick={() => {
+                        if (selectedVault.armoredFileBase64!.startsWith('local_only:')) {
+                          alert(language === 'es' 
+                            ? 'Este archivo supera el límite de tamaño de la nube (1 MB) y solo está guardado en el dispositivo del perito que lo creó originalmente.' 
+                            : 'This file exceeds the cloud size limit (1 MB) and is only saved on the device of the auditor who originally created it.');
+                          return;
+                        }
                         const link = document.createElement('a');
                         link.href = selectedVault.armoredFileBase64!;
                         link.download = `${language === 'es' ? 'blindado' : 'shielded'}_${selectedVault.manifest.payload.originalFilename || 'archivo.bin'}`;
