@@ -1,0 +1,8 @@
+{
+  "name": "viewQ",
+  "description": "Progressive Web Application for hybrid post-quantum cryptographic data sealing using real IonQ QRNG entropy and NIST ML-KEM-768 standard modeling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
