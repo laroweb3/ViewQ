@@ -212,8 +212,8 @@ export const SettingsView: React.FC = () => {
                 </span>
                 <p className="text-[10px] text-gray-500 leading-relaxed font-sans">
                   {language === 'es' 
-                    ? 'Si las claves de Stellar u IonQ están ausentes, el sistema conmuta instantáneamente a simulación local para una operatividad fluida sin errores.' 
-                    : 'If Stellar or IonQ keys are absent, the system instantly switches to local simulation for smooth, error-free operations.'}
+                    ? 'Si las claves de Stellar u IonQ están ausentes, el sistema conmuta instantáneamente a ejecución virtual local para una operatividad fluida sin errores.' 
+                    : 'If Stellar or IonQ keys are absent, the system instantly switches to local virtual execution for smooth, error-free operations.'}
                 </p>
               </div>
             </div>
@@ -247,7 +247,7 @@ export const SettingsView: React.FC = () => {
                     type={showToken ? 'text' : 'password'}
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    placeholder={language === 'es' ? "Deje vacío para usar simulación cuántica local..." : "Leave empty to use local quantum simulation..."}
+                    placeholder={language === 'es' ? "Deje vacío para usar entropía cuántica virtual local..." : "Leave empty to use local virtual quantum entropy..."}
                     className="w-full text-xs font-mono pl-3.5 pr-10 py-2.5 rounded-sm border border-[#eaeaea] bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white transition-all"
                   />
                   <button
@@ -271,7 +271,7 @@ export const SettingsView: React.FC = () => {
                     onChange={(e) => setTarget(e.target.value as QPUTarget)}
                     className="w-full text-xs font-sans px-3.5 py-2.5 rounded-sm border border-[#eaeaea] bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white transition-all cursor-pointer"
                   >
-                    <option value="ionq.simulator">{language === 'es' ? 'ionq.simulator (Simulador en Nube)' : 'ionq.simulator (Cloud Simulator)'}</option>
+                    <option value="ionq.simulator">{language === 'es' ? 'ionq.simulator (Procesador Cuántico Virtual)' : 'ionq.simulator (Virtual Quantum Processor)'}</option>
                     <option value="ionq.qpu.aria-1">{language === 'es' ? 'ionq.qpu.aria-1 (25 Qubits Físicos)' : 'ionq.qpu.aria-1 (25 Physical Qubits)'}</option>
                     <option value="ionq.qpu.forte-1">{language === 'es' ? 'ionq.qpu.forte-1 (35 Qubits Físicos)' : 'ionq.qpu.forte-1 (35 Physical Qubits)'}</option>
                   </select>

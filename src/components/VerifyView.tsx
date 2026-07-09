@@ -38,6 +38,7 @@ interface VerificationResult {
   format: 'pdf' | 'steg' | 'none' | 'json';
   stellarTx: string | null;
   stellarNetwork?: 'testnet' | 'public';
+  stellarIsSimulated?: boolean;
   ionqJobId: string | null;
   originalHash: string | null;
   currentHash: string;
@@ -178,6 +179,7 @@ export const VerifyView: React.FC = () => {
           format: 'steg',
           stellarTx,
           stellarNetwork,
+          stellarIsSimulated: manifestData.stellarNotarization?.isSimulated !== false,
           ionqJobId,
           originalHash,
           currentHash: originalHash,
@@ -236,6 +238,7 @@ export const VerifyView: React.FC = () => {
           format: 'json',
           stellarTx,
           stellarNetwork,
+          stellarIsSimulated: manifestData.stellarNotarization?.isSimulated !== false,
           ionqJobId,
           originalHash,
           currentHash: originalHash,
@@ -334,6 +337,7 @@ export const VerifyView: React.FC = () => {
         format: extracted.format,
         stellarTx: extracted.stellarTx,
         stellarNetwork,
+        stellarIsSimulated: matchedVaultForProfile?.stellarNotarization?.isSimulated !== false,
         ionqJobId: extracted.ionqJobId,
         originalHash: extracted.originalHash,
         currentHash,
@@ -572,11 +576,18 @@ export const VerifyView: React.FC = () => {
                             href={`https://stellar.expert/explorer/${(result.stellarNetwork || settings.stellarNetwork) === 'public' ? 'public' : 'testnet'}/tx/${result.stellarTx}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline font-semibold font-sans text-[9px]"
+                            className="text-blue-600 hover:underline font-semibold font-sans text-[9px] animate-pulse"
                           >
                             {t.viewInExplorer} →
                           </a>
                         </div>
+                        {result.stellarIsSimulated !== false && (
+                          <div className="text-[9px] text-amber-700 bg-amber-50/50 p-1.5 rounded-sm border border-amber-100/30 font-sans leading-normal mt-1">
+                            {language === 'es' 
+                              ? '⚠️ Sello de Demostración: Registro virtual local. No figurará en el explorador de Stellar real.'
+                              : '⚠️ Demo Seal: Virtual local registration. It will not appear in the live Stellar explorer.'}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p className="text-xs font-semibold text-gray-400 italic">
@@ -764,12 +775,50 @@ export const VerifyView: React.FC = () => {
 
           <div className="p-1 bg-slate-900 border border-slate-800 rounded-sm overflow-hidden min-h-[400px] flex flex-col justify-between">
             {/* Render PDF */}
-            {decryptedContent.payload.startsWith('data:application/pdf') ? (
-              <iframe
-                src={decryptedContent.payload}
-                className="w-full h-[600px] bg-slate-800 rounded-sm border border-slate-700"
-                title="Zero-Trace Document View"
-              />
+            {decryptedContent.payload.includes('application/pdf') ? (
+              <div className="flex flex-col items-center justify-center p-4 bg-slate-950/80 rounded-sm space-y-4 w-full">
+                <object
+                  data={decryptedContent.payload}
+                  type="application/pdf"
+                  className="w-full h-[550px] bg-slate-800 rounded-sm border border-slate-700"
+                >
+                  <iframe
+                    src={decryptedContent.payload}
+                    className="w-full h-[550px] bg-slate-800 rounded-sm border border-slate-700"
+                    title="Zero-Trace Document View"
+                  />
+                </object>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      const newWindow = window.open();
+                      if (newWindow) {
+                        newWindow.document.write(
+                          `<iframe src="${decryptedContent.payload}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
+                        );
+                      } else {
+                        alert(language === 'es' ? 'La ventana emergente fue bloqueada por su navegador.' : 'Popup was blocked by your browser.');
+                      }
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-xs font-sans font-bold transition-all cursor-pointer"
+                  >
+                    {language === 'es' ? 'Abrir PDF en Pantalla Completa' : 'Open PDF in Full Screen'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = decryptedContent.payload;
+                      link.download = decryptedContent.filename || 'evidencia_descifrada.pdf';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-sm text-xs font-sans font-bold transition-all cursor-pointer"
+                  >
+                    {language === 'es' ? 'Descargar PDF Descifrado' : 'Download Decrypted PDF'}
+                  </button>
+                </div>
+              </div>
             ) : /* Render Image */
             decryptedContent.payload.startsWith('data:image/') ? (
               <div className="flex items-center justify-center p-6 bg-slate-950/80 rounded-sm">

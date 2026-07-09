@@ -21,9 +21,11 @@ const SPANISH_DICEWARE_WORDS = [
 ];
 
 export const AuthScreen: React.FC = () => {
-  const { login, settings, language, setLanguage } = useApp();
+  const { login, settings, language, setLanguage, registeredUsers } = useApp();
   const [username, setUsername] = useState('');
+  const [pin, setPin] = useState('');
   const [authMode, setAuthMode] = useState<'passkey' | 'diceware'>('passkey');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   // Virtual Keyboard states
   const [showKeyboard, setShowKeyboard] = useState(false);
@@ -72,6 +74,37 @@ export const AuthScreen: React.FC = () => {
     e.preventDefault();
     if (!username.trim()) return;
 
+    setErrorMsg(null);
+    const normalized = username.trim().toLowerCase();
+    const userExists = registeredUsers.some(u => u.username.toLowerCase() === normalized) || normalized === 'laro';
+
+    if (!userExists) {
+      setErrorMsg(language === 'es' 
+        ? `El perito o fiscal "${username}" no se encuentra registrado en el Enclave Cuántico. Si es nuevo, por favor cree su identidad en la pestaña "Crear cuenta".`
+        : `The expert or prosecutor "${username}" is not registered in the Quantum Enclave. If you are new, please create your identity in the "Create Account" tab.`
+      );
+      return;
+    }
+
+    // Immediate security PIN validation (avoiding simulated handshake on wrong PIN)
+    const matchedUser = registeredUsers.find(u => u.username.toLowerCase() === normalized);
+    if (matchedUser && matchedUser.pin) {
+      if (!pin) {
+        setErrorMsg(language === 'es'
+          ? "Este usuario tiene un PIN de seguridad configurado. Por favor, ingrese su PIN de 6 dígitos."
+          : "This user has a security PIN configured. Please enter your 6-digit PIN."
+        );
+        return;
+      }
+      if (matchedUser.pin !== pin) {
+        setErrorMsg(language === 'es'
+          ? "PIN de seguridad incorrecto. Acceso denegado."
+          : "Incorrect security PIN. Access denied."
+        );
+        return;
+      }
+    }
+
     setStep('registering');
     setLogs([]);
     addLocalLog(language === 'es' ? "Iniciando Handshake de Autenticación de Grado Militar..." : "Starting Military-Grade Authentication Handshake...");
@@ -86,7 +119,7 @@ export const AuthScreen: React.FC = () => {
       await new Promise(r => setTimeout(r, 1000));
       challenge = sha3_256(Math.random().toString() + Date.now().toString());
     } else {
-      addLocalLog(language === 'es' ? "Utilizando simulador cuántico local para la semilla del challenge de WebAuthn..." : "Using local quantum simulator for WebAuthn challenge seed...");
+      addLocalLog(language === 'es' ? "Utilizando motor cuántico virtual local para la semilla del challenge de WebAuthn..." : "Using local virtual quantum engine for WebAuthn challenge seed...");
       await new Promise(r => setTimeout(r, 800));
       challenge = sha3_256("VIBEDESK_QRNG_CHALLENGE_" + Math.random().toString() + Date.now().toString());
     }
@@ -150,7 +183,16 @@ export const AuthScreen: React.FC = () => {
     addLocalLog(language === 'es' ? "¡Sesión validada exitosamente!" : "Session successfully validated!");
     setStep('authenticated');
     await new Promise(r => setTimeout(r, 600));
-    login(username, 'passkey');
+    
+    try {
+      await login(username, 'passkey', pin);
+    } catch (err: any) {
+      setStep('welcome');
+      setErrorMsg(language === 'es'
+        ? "Error inesperado durante la autenticación. Por favor, reintente."
+        : "Unexpected error during authentication. Please retry."
+      );
+    }
   };
 
   // 2. Quantum Diceware phrase generation (IonQ selected)
@@ -183,11 +225,47 @@ export const AuthScreen: React.FC = () => {
     setIsGenerating(false);
   };
 
-  const handleDicewareLogin = (e: React.FormEvent) => {
+  const handleDicewareLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || dicewarePhrase.length < 5) return;
     
-    login(username, 'diceware');
+    setErrorMsg(null);
+    const normalized = username.trim().toLowerCase();
+    const userExists = registeredUsers.some(u => u.username.toLowerCase() === normalized) || normalized === 'laro';
+    
+    if (userExists) {
+      setErrorMsg(language === 'es'
+        ? `La identidad "${username}" ya está registrada en el Enclave Cuántico. Por favor, intente con otro nombre de usuario o inicie sesión si le pertenece.`
+        : `The identity "${username}" is already registered in the Quantum Enclave. Please try another username or log in if it belongs to you.`
+      );
+      return;
+    }
+
+    // Require 6-digit PIN
+    if (!pin || pin.length !== 6 || !/^\d+$/.test(pin)) {
+      setErrorMsg(language === 'es'
+        ? "Debe definir un PIN de seguridad numérico de exactamente 6 dígitos para proteger su cuenta."
+        : "You must define a numeric security PIN of exactly 6 digits to protect your account."
+      );
+      return;
+    }
+
+    setStep('registering');
+    setLogs([]);
+    addLocalLog(language === 'es' ? "Registrando nueva identidad pericial con firma Diceware..." : "Registering new forensic identity with Diceware signature...");
+    await new Promise(r => setTimeout(r, 800));
+    addLocalLog(language === 'es' ? "Notarizando firma de registro en el ledger local..." : "Notarizing registration signature in local ledger...");
+    await new Promise(r => setTimeout(r, 600));
+    addLocalLog(language === 'es' ? "¡Sesión validada exitosamente!" : "Session successfully validated!");
+    setStep('authenticated');
+    await new Promise(r => setTimeout(r, 600));
+
+    try {
+      await login(username, 'diceware', pin);
+    } catch (err: any) {
+      setStep('welcome');
+      setErrorMsg(err.message || 'Error de registro');
+    }
   };
 
   return (
@@ -226,19 +304,30 @@ export const AuthScreen: React.FC = () => {
           </p>
         </div>
 
+        {/* Security Alert Banner */}
+        {errorMsg && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-sm text-red-800 text-xs text-left flex items-start gap-3 animate-fade-in animate-duration-300" id="auth-error-banner">
+            <ShieldAlert size={16} className="text-red-700 mt-0.5 flex-shrink-0 animate-bounce" />
+            <div>
+              <p className="font-sans font-bold text-gray-900 uppercase tracking-wide text-[10px] text-red-700">{language === 'es' ? 'ALERTA DE SEGURIDAD' : 'SECURITY ALERT'}</p>
+              <p className="text-gray-600 mt-1 leading-relaxed font-sans">{errorMsg}</p>
+            </div>
+          </div>
+        )}
+
         {/* Tab selection */}
         {step === 'welcome' && (
           <div className="flex border-b border-[#eaeaea] mb-6">
             <button
-              onClick={() => { setAuthMode('passkey'); setLogs([]); }}
+              onClick={() => { setAuthMode('passkey'); setLogs([]); setPin(''); setErrorMsg(null); }}
               className={`flex-1 pb-3 text-xs font-sans font-semibold uppercase tracking-wider text-center transition-colors ${
                 authMode === 'passkey' ? 'text-black border-b-2 border-black font-bold' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              {language === 'es' ? 'Iniciar sesion' : 'Log In'}
+              {language === 'es' ? 'Iniciar sesión' : 'Log In'}
             </button>
             <button
-              onClick={() => { setAuthMode('diceware'); setLogs([]); }}
+              onClick={() => { setAuthMode('diceware'); setLogs([]); setPin(''); setErrorMsg(null); }}
               className={`flex-1 pb-3 text-xs font-sans font-semibold uppercase tracking-wider text-center transition-colors ${
                 authMode === 'diceware' ? 'text-black border-b-2 border-black font-bold' : 'text-gray-400 hover:text-gray-600'
               }`}
@@ -282,6 +371,42 @@ export const AuthScreen: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Optional/Required PIN field for Login */}
+                {(() => {
+                  const normalized = username.trim().toLowerCase();
+                  const matchedUser = registeredUsers.find(u => u.username.toLowerCase() === normalized);
+                  const hasPin = matchedUser && matchedUser.pin;
+                  return (
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-xs font-sans text-gray-600 font-medium flex justify-between items-center">
+                        <span>{language === 'es' ? 'PIN de Seguridad (6 dígitos)' : 'Security PIN (6 digits)'}</span>
+                        {hasPin ? (
+                          <span className="text-[9px] font-sans font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-sm">
+                            {language === 'es' ? 'REQUERIDO' : 'REQUIRED'}
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-gray-400 font-sans">
+                            {language === 'es' ? 'Solo si fue configurado' : 'Optional'}
+                          </span>
+                        )}
+                      </label>
+                      <div className="relative flex items-center">
+                        <Key className="absolute left-3 text-gray-400" size={14} />
+                        <input
+                          type="password"
+                          maxLength={6}
+                          pattern="\d*"
+                          value={pin}
+                          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                          placeholder="••••••"
+                          required={!!hasPin}
+                          className="w-full text-xs font-mono pl-9 pr-3 py-3 border border-[#eaeaea] bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white tracking-widest transition-all rounded-sm"
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <button
                   type="submit"
                   className="w-full py-3 bg-black hover:bg-zinc-800 text-white text-xs font-sans font-medium uppercase tracking-wider rounded-sm transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
@@ -319,6 +444,32 @@ export const AuthScreen: React.FC = () => {
                       <Keyboard size={15} className={showKeyboard ? "text-black" : ""} />
                     </button>
                   </div>
+                </div>
+
+                {/* Definiendo PIN de Seguridad para Registro */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-xs font-sans text-gray-600 font-medium flex justify-between items-center">
+                    <span>{language === 'es' ? 'Definir PIN de Seguridad (6 dígitos)' : 'Define Security PIN (6 digits)'}</span>
+                    <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-sm font-semibold">
+                      {language === 'es' ? 'OBLIGATORIO' : 'REQUIRED'}
+                    </span>
+                  </label>
+                  <div className="relative flex items-center">
+                    <Key className="absolute left-3 text-gray-400" size={14} />
+                    <input
+                      type="password"
+                      maxLength={6}
+                      pattern="\d*"
+                      required
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                      placeholder="••••••"
+                      className="w-full text-xs font-mono pl-9 pr-3 py-3 border border-[#eaeaea] rounded-sm bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white tracking-widest transition-all"
+                    />
+                  </div>
+                  <p className="text-[9px] text-gray-400 leading-normal">
+                    {language === 'es' ? 'Se requerirá este PIN numérico cada vez que inicie sesión para proteger su identidad pericial.' : 'This numeric PIN will be required every time you log in to protect your forensic identity.'}
+                  </p>
                 </div>
 
                 <div className="border border-[#eaeaea] rounded-sm p-4 bg-[#fafafa] text-left space-y-3">

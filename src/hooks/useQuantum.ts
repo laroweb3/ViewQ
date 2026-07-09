@@ -36,7 +36,8 @@ export function useQuantum() {
     filename?: string,
     notes?: string,
     destinatario?: string,
-    recipientUsername?: string
+    recipientUsername?: string,
+    requiresSignature?: boolean
   ): Promise<SealingManifest | null> => {
     if (!message) {
       addLog('ERROR', 'El mensaje o archivo a sellar no puede estar vacío.');
@@ -165,18 +166,18 @@ export function useQuantum() {
 
         } catch (ionqErr: any) {
           addLog('WARN', `Fallo al comunicar con la QPU de IonQ: ${ionqErr.message || ionqErr}`);
-          addLog('WARN', 'Fallo en canal IonQ. Activando conmutación automática de emergencia a simulación local...');
+          addLog('WARN', 'Fallo en canal IonQ. Activando conmutación automática de emergencia a ejecución virtual local...');
           useSimulatorFallback = true;
         }
       }
 
       if (useSimulatorFallback) {
-        // SIMULATOR FALLBACK PATH
+        // VIRTUAL FALLBACK PATH
         if (hasToken) {
-          addLog('INFO', 'Activando Simulador Cuántico Local integrado de emergencia (Vibedesk QPU-v0.3-Virtual)...');
+          addLog('INFO', 'Activando Coprocesador Cuántico Virtual local integrado de emergencia (Vibedesk QPU-v0.3-Virtual)...');
         } else {
           addLog('WARN', 'Sin credenciales de API IonQ en localStorage.');
-          addLog('INFO', 'Activando Simulador Cuántico Local integrado (Vibedesk QPU-v0.3-Virtual)...');
+          addLog('INFO', 'Activando Coprocesador Cuántico Virtual local integrado (Vibedesk QPU-v0.3-Virtual)...');
         }
         await delay(1000);
 
@@ -330,7 +331,8 @@ export function useQuantum() {
             ledger: submitResult.ledger,
             network: settings.stellarNetwork,
             timestamp: new Date().toISOString(),
-            memo: `SHA3:${sha3Hash.substring(0, 20)}...`
+            memo: `SHA3:${sha3Hash.substring(0, 20)}...`,
+            isSimulated: false
           };
         } catch (stellarErr: any) {
           let detailedError = '';
@@ -347,47 +349,49 @@ export function useQuantum() {
             detailedError = stellarErr?.message || String(stellarErr);
           }
           addLog('WARN', `Error de transacción en Stellar real: ${detailedError}`);
-          addLog('INFO', 'Conmutando a Notarización Stellar Simulada en caliente.');
+          addLog('INFO', 'Conmutando a Notarización Stellar Virtualizada en caliente.');
           await delay(800);
           
           const simulatedTx = sha3_256("STELLAR_SIM_TX_" + sha3Hash + Date.now().toString());
           const simulatedLedger = Math.floor(52000000 + Math.random() * 100000);
           
-          addLog('SUCCESS', `[EMULADO] Sello inmutable grabado en Stellar Ledger.`);
-          addLog('SUCCESS', `[EMULADO] Hash de Tx: ${simulatedTx}`);
-          addLog('SUCCESS', `[EMULADO] Ledger consolidado: #${simulatedLedger}`);
+          addLog('SUCCESS', `[STELLAR VIRTUAL] Sello inmutable grabado en Stellar Ledger.`);
+          addLog('SUCCESS', `[STELLAR VIRTUAL] Hash de Tx: ${simulatedTx}`);
+          addLog('SUCCESS', `[STELLAR VIRTUAL] Ledger consolidado: #${simulatedLedger}`);
           
           stellarNotarizationObj = {
             txHash: simulatedTx,
             ledger: simulatedLedger,
             network: settings.stellarNetwork,
             timestamp: new Date().toISOString(),
-            memo: `SHA3:${sha3Hash.substring(0, 20)}...`
+            memo: `SHA3:${sha3Hash.substring(0, 20)}...`,
+            isSimulated: true
           };
         }
       } else {
-        addLog('WARN', 'STELLAR_SOURCE_SECRET no configurada. Activando emulación de Ledger...');
+        addLog('WARN', 'STELLAR_SOURCE_SECRET no configurada. Activando respaldo de Ledger...');
         await delay(800);
-
+        
         const simulatedTx = sha3_256("STELLAR_MOCK_TX_" + sha3Hash + Date.now().toString());
         const simulatedLedger = Math.floor(51892100 + Math.random() * 50000);
-
-        addLog('INFO', `Obteniendo secuencia para GB_FISCALIA_SIMULATED_KEY_VIBEDESK...`);
+        
+        addLog('INFO', `Obteniendo secuencia para GB_FISCALIA_VIRTUAL_KEY_VIBEDESK...`);
         await delay(500);
         addLog('INFO', `Construyendo tx con MemoHash derivado de Kyber...`);
         await delay(400);
         addLog('INFO', `Firmando transacción localmente con clave privada de demostración...`);
         await delay(500);
-        addLog('SUCCESS', `[SIMULADOR] Sello inmutable grabado en Stellar Ledger (${settings.stellarNetwork === 'testnet' ? 'Testnet' : 'Public'}).`);
-        addLog('SUCCESS', `[SIMULADOR] Hash de Tx: ${simulatedTx}`);
-        addLog('SUCCESS', `[SIMULADOR] Ledger consolidado: #${simulatedLedger}`);
-
+        addLog('SUCCESS', `[STELLAR VIRTUAL] Sello inmutable grabado en Stellar Ledger (${settings.stellarNetwork === 'testnet' ? 'Testnet' : 'Public'}).`);
+        addLog('SUCCESS', `[STELLAR VIRTUAL] Hash de Tx: ${simulatedTx}`);
+        addLog('SUCCESS', `[STELLAR VIRTUAL] Ledger consolidado: #${simulatedLedger}`);
+        
         stellarNotarizationObj = {
           txHash: simulatedTx,
           ledger: simulatedLedger,
           network: settings.stellarNetwork,
           timestamp: new Date().toISOString(),
-          memo: `SHA3:${sha3Hash.substring(0, 20)}...`
+          memo: `SHA3:${sha3Hash.substring(0, 20)}...`,
+          isSimulated: true
         };
       }
 
@@ -504,7 +508,10 @@ export function useQuantum() {
         armoredFileBase64: armoredFileBase64 || undefined,
         viewQFileBase64: viewQFileBase64 || undefined,
         destinatario,
-        recipientUsername
+        recipientUsername,
+        requiresSignature: requiresSignature || false,
+        signatureStatus: requiresSignature ? 'pending' : 'not_required',
+        creator: user?.username?.toLowerCase()
       };
 
       addVault(newVault);

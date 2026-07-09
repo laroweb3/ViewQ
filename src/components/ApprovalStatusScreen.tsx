@@ -19,7 +19,7 @@ export const ApprovalStatusScreen: React.FC = () => {
       rejectedBadge: 'Acceso Rechazado',
       checkBtn: 'Verificar Estado Actual',
       checking: 'Sincronizando con ledger de gobernanza...',
-      noChangesEs: 'Consola: Su registro para laro sigue en estado de revisión. Por favor, espere la aprobación del superadmin Laro.',
+      noChangesEs: 'Consola: Su registro sigue en estado de revisión. Por favor, espere la aprobación del Superadministrador.',
       logoutBtn: 'Cerrar Sesión',
       backToLogin: 'Volver a Identificación',
       securityStatus: 'Enclave de Seguridad Cuántica'
@@ -34,7 +34,7 @@ export const ApprovalStatusScreen: React.FC = () => {
       rejectedBadge: 'Access Rejected',
       checkBtn: 'Verify Status Now',
       checking: 'Synchronizing with governance ledger...',
-      noChangesEs: 'Console: Your registry is still under review. Please wait for superadmin Laro approval.',
+      noChangesEs: 'Console: Your registry is still under review. Please wait for Superadministrator approval.',
       logoutBtn: 'Log Out',
       backToLogin: 'Back to Login',
       securityStatus: 'Quantum Security Enclave'
@@ -64,7 +64,7 @@ export const ApprovalStatusScreen: React.FC = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
       window.location.reload();
     } else if (liveStatus === 'rejected') {
-      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ACCESO RECHAZADO: Póngase en contacto con Laro.`]);
+      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${language === 'es' ? 'ACCESO RECHAZADO: Póngase en contacto con el Administrador.' : 'ACCESS DENIED: Contact the Administrator.'}`]);
     } else {
       setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Estado actual: PENDIENTE. No se detectan firmas de aprobación todavía.`]);
     }
@@ -123,16 +123,16 @@ export const ApprovalStatusScreen: React.FC = () => {
           <p className="text-gray-600 leading-relaxed font-sans">
             {isRejected 
               ? (language === 'es' 
-                  ? 'Su clave post-cuántica y perfil forense han sido bloqueados. Por favor, póngase en contacto con Laro para resolver discrepancias de credenciales.'
-                  : 'Your post-quantum key and forensic profile have been locked. Please contact Laro to resolve credential discrepancies.')
+                  ? 'Su clave post-cuántica y perfil forense han sido bloqueados. Por favor, póngase en contacto con el Administrador para resolver discrepancias de credenciales.'
+                  : 'Your post-quantum key and forensic profile have been locked. Please contact the Administrator to resolve credential discrepancies.')
               : (language === 'es'
-                  ? 'Solo el superadmin "Laro" puede otorgar permisos oficiales de inyección cuántica en el panel de control de usuarios.'
-                  : 'Only superadmin "Laro" can grant official quantum injection permissions in the user control panel.')
+                  ? 'Solo el Superadministrador puede otorgar permisos oficiales de inyección cuántica en el panel de control de usuarios.'
+                  : 'Only the Superadministrator can grant official quantum injection permissions in the user control panel.')
             }
           </p>
           <div className="text-[10px] font-mono text-gray-400 flex items-center justify-between pt-1.5 border-t border-gray-200/60">
-            <span>Superadmin:</span>
-            <span className="text-black font-semibold uppercase">Laro</span>
+            <span>{language === 'es' ? 'Rol Requerido:' : 'Required Role:'}</span>
+            <span className="text-black font-semibold uppercase">Superadmin</span>
           </div>
         </div>
 

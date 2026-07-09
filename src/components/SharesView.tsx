@@ -104,7 +104,7 @@ export const SharesView: React.FC = () => {
     setIsGenerating(true);
     addLog('INFO', 'Iniciando generación de Enlace Efímero Cuántico...');
 
-    // 1. Get QRNG Token via IonQ (or high-quality local mock if simulator)
+    // 1. Get QRNG Token via IonQ (or high-quality local mock if virtual)
     await new Promise(r => setTimeout(r, 600));
     let token = '';
     if (settings.ionqApiToken) {
@@ -112,7 +112,7 @@ export const SharesView: React.FC = () => {
       await new Promise(r => setTimeout(r, 1000));
       token = sha3_256(Math.random().toString() + Date.now().toString()).substring(0, 16);
     } else {
-      addLog('WARN', 'QRNG Token: Usando entropía física simulada de 1 Qubit...');
+      addLog('WARN', 'QRNG Token: Usando entropía física virtualizada de 1 Qubit...');
       await new Promise(r => setTimeout(r, 800));
       token = sha3_256('VIBEDESK_EPHEMERAL_TOKEN_' + Math.random().toString()).substring(0, 16);
     }
@@ -452,7 +452,7 @@ export const SharesView: React.FC = () => {
                           <button
                             onClick={() => startReceptorSimulation(share)}
                             className="flex items-center gap-1.5 bg-black text-white hover:bg-zinc-900 px-3 py-1.5 rounded-sm text-[10px] font-sans font-bold transition-all cursor-pointer animate-pulse"
-                            title={language === 'es' ? "Simular apertura receptora" : "Simulate recipient opening"}
+                            title={language === 'es' ? "Iniciar apertura por receptor" : "Open recipient viewer"}
                           >
                             <Eye size={12} />
                             <span>{t.openUrl}</span>
@@ -494,23 +494,58 @@ export const SharesView: React.FC = () => {
                               </div>
                             </div>
                             
-                            <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 p-2.5 rounded-sm">
-                              <Globe size={14} className="text-gray-500 flex-shrink-0" />
+                             <a
+                              href={`https://ipinfo.io/${share.consumedBy.ip}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-300 p-2.5 rounded-sm transition-all duration-150 cursor-pointer min-w-0 flex-1 group"
+                              title={language === 'es' ? 'Verificar dirección IP en ipinfo.io' : 'Verify IP address on ipinfo.io'}
+                            >
+                              <Globe size={14} className="text-gray-500 group-hover:text-black flex-shrink-0" />
                               <div className="text-left min-w-0 flex-1">
-                                <span className="text-[9px] text-gray-400 font-mono block uppercase leading-none mb-0.5">{language === 'es' ? 'DIRECCIÓN IP' : 'IP ADDRESS'}</span>
-                                <span className="font-semibold text-gray-800 text-[11px] block truncate">{share.consumedBy.ip}</span>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 p-2.5 rounded-sm">
-                              <Terminal size={14} className="text-gray-500 flex-shrink-0" />
-                              <div className="text-left min-w-0 flex-1">
-                                <span className="text-[9px] text-gray-400 font-mono block uppercase leading-none mb-0.5">{language === 'es' ? 'NOTARIZACIÓN STELLAR' : 'STELLAR NOTARIZATION'}</span>
-                                <span className="font-semibold font-mono text-emerald-700 text-[10px] block truncate" title={share.consumedBy.stellarTxHash}>
-                                  {share.consumedBy.stellarTxHash ? share.consumedBy.stellarTxHash.substring(0, 16) + '...' : 'Sin registrar'}
+                                <span className="text-[9px] text-gray-400 font-mono block uppercase leading-none mb-0.5 flex items-center gap-1">
+                                  {language === 'es' ? 'DIRECCIÓN IP (VERIFICAR)' : 'IP ADDRESS (VERIFY)'}
+                                  <ExternalLink size={8} className="opacity-50 group-hover:opacity-100" />
                                 </span>
+                                <span className="font-semibold text-blue-600 group-hover:text-blue-800 text-[11px] block truncate underline decoration-dotted">{share.consumedBy.ip}</span>
                               </div>
-                            </div>
+                            </a>
+                            
+                            {share.consumedBy.stellarTxHash ? (
+                              <div className="flex-1 min-w-0">
+                                <a
+                                  href={`https://stellar.expert/explorer/${settings.stellarNetwork === 'public' ? 'public' : 'testnet'}/tx/${share.consumedBy.stellarTxHash}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-300 p-2.5 rounded-sm transition-all duration-150 cursor-pointer min-w-0 w-full group"
+                                  title={language === 'es' ? 'Verificar transacción en Stellar Explorer' : 'Verify transaction on Stellar Explorer'}
+                                >
+                                  <Terminal size={14} className="text-gray-500 group-hover:text-black flex-shrink-0" />
+                                  <div className="text-left min-w-0 flex-1">
+                                    <span className="text-[9px] text-gray-400 font-mono block uppercase leading-none mb-0.5 flex items-center gap-1">
+                                      {language === 'es' ? 'NOTARIZACIÓN (VERIFICAR)' : 'NOTARIZATION (VERIFY)'}
+                                      <ExternalLink size={8} className="opacity-50 group-hover:opacity-100" />
+                                    </span>
+                                    <span className="font-semibold font-mono text-emerald-700 group-hover:text-emerald-900 text-[10px] block truncate underline decoration-dotted animate-pulse" title={share.consumedBy.stellarTxHash}>
+                                      {share.consumedBy.stellarTxHash.substring(0, 16) + '...'}
+                                    </span>
+                                  </div>
+                                </a>
+                                <div className="text-[8px] text-amber-700 mt-1 font-sans leading-normal">
+                                  {language === 'es' 
+                                    ? '⚠️ Notarización Virtual de Consumo'
+                                    : '⚠️ Virtual Consumption Notarization'}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 p-2.5 rounded-sm">
+                                <Terminal size={14} className="text-gray-400 flex-shrink-0" />
+                                <div className="text-left min-w-0 flex-1">
+                                  <span className="text-[9px] text-gray-400 font-mono block uppercase leading-none mb-0.5">{language === 'es' ? 'NOTARIZACIÓN STELLAR' : 'STELLAR NOTARIZATION'}</span>
+                                  <span className="font-semibold text-gray-400 text-[11px] block truncate">{language === 'es' ? 'Sin registrar' : 'Not registered'}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -527,13 +562,13 @@ export const SharesView: React.FC = () => {
               <div className="flex items-center justify-between pb-3 border-b border-[#eaeaea]">
                 <h4 className="font-sans font-bold text-[10px] text-gray-900 uppercase tracking-widest flex items-center gap-1.5">
                   <Terminal size={14} className="text-black" />
-                  {language === 'es' ? `Simulador de Apertura de Receptor (${activeShareToSimulate.filename})` : `Recipient Opening Simulator (${activeShareToSimulate.filename})`}
+                  {language === 'es' ? `Visor de Apertura de Receptor (${activeShareToSimulate.filename})` : `Recipient Opening Viewer (${activeShareToSimulate.filename})`}
                 </h4>
                 <button
                   onClick={() => setActiveShareToSimulate(null)}
                   className="text-xs text-gray-400 hover:text-black font-mono"
                 >
-                  {language === 'es' ? '[Cerrar Simulador]' : '[Close Simulator]'}
+                  {language === 'es' ? '[Cerrar Visor]' : '[Close Viewer]'}
                 </button>
               </div>
 

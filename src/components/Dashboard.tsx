@@ -21,7 +21,12 @@ import {
   Share2,
   Link2,
   Send,
-  HelpCircle
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  Sparkles,
+  BookOpen
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -36,12 +41,14 @@ export const Dashboard: React.FC = () => {
   const [payloadText, setPayloadText] = useState('');
   const [selectedFile, setSelectedFile] = useState<{ name: string; size: number; type: string; content: string } | null>(null);
   const [showTextArea, setShowTextArea] = useState(false);
+  const [requiresSignature, setRequiresSignature] = useState(false);
   
   const [copied, setCopied] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showJson, setShowJson] = useState(false);
   const [isDownloadingArmored, setIsDownloadingArmored] = useState(false);
   const [isDownloadingViewQ, setIsDownloadingViewQ] = useState(false);
+  const [showDidacticGuide, setShowDidacticGuide] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -138,7 +145,16 @@ export const Dashboard: React.FC = () => {
       }
     }
 
-    await executePipeline(finalPayload, finalTitle, finalFilename, finalNotes, destinatario, recipientUser || undefined);
+    await executePipeline(
+      finalPayload,
+      finalTitle,
+      finalFilename,
+      finalNotes,
+      destinatario,
+      recipientUser || undefined,
+      requiresSignature
+    );
+    setRequiresSignature(false);
   };
 
   // Copy manifest to clipboard with sandbox safety fallback
@@ -287,7 +303,7 @@ export const Dashboard: React.FC = () => {
     if (isRunning) {
       step1 = 'running';
       
-      if (hasLog('Calculando hash') || hasLog('SHA3-256 Hash del Mensaje') || hasLog('circuito cuántico') || hasLog('Simulador Cuántico') || hasLog('Hadamard')) {
+      if (hasLog('Calculando hash') || hasLog('SHA3-256 Hash del Mensaje') || hasLog('circuito cuántico') || hasLog('Simulador Cuántico') || hasLog('Coprocesador Cuántico') || hasLog('Hadamard')) {
         step1 = 'success';
         step2 = 'running';
       }
@@ -341,6 +357,91 @@ export const Dashboard: React.FC = () => {
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
           <span>{language === 'es' ? 'NODO SEGURO ACTIVO' : 'ACTIVE SECURE NODE'}: <strong className="text-black font-semibold uppercase">{settings.target}</strong></span>
         </div>
+      </div>
+
+      {/* Interactive Didactic Guide (Collapsible, Plain-Language Explanation) */}
+      <div className="bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border border-indigo-100/80 rounded-sm p-5 shadow-xs transition-all duration-300">
+        <div className="flex items-center justify-between cursor-pointer select-none" onClick={() => setShowDidacticGuide(!showDidacticGuide)}>
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-indigo-600 text-white rounded-sm flex items-center justify-center">
+              <BookOpen size={15} />
+            </div>
+            <div>
+              <h2 className="font-sans font-bold text-xs uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
+                {language === 'es' ? 'Guía Didáctica de Custodia' : 'Forensic Custody Guide'}
+                <span className="text-[10px] bg-indigo-200/80 text-indigo-850 px-2 py-0.5 rounded-full lowercase font-mono font-normal">
+                  {language === 'es' ? 'explicación sencilla sin tecnicismos' : 'simple explanation without jargon'}
+                </span>
+              </h2>
+              <p className="text-[11px] text-indigo-700 font-sans mt-0.5">
+                {language === 'es' 
+                  ? 'Entienda cómo protegemos su evidencia en 4 simples analogías del mundo real.' 
+                  : 'Understand how we protect your evidence in 4 simple real-world analogies.'}
+              </p>
+            </div>
+          </div>
+          <button type="button" className="p-1 text-indigo-600 hover:text-indigo-900 transition-colors cursor-pointer">
+            {showDidacticGuide ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+        </div>
+
+        {showDidacticGuide && (
+          <div className="mt-4 pt-4 border-t border-indigo-100/50 grid grid-cols-1 md:grid-cols-4 gap-4 text-left animate-fadeIn">
+            
+            {/* Step 1: El Sobre Digital */}
+            <div className="space-y-1 bg-white/85 p-3.5 rounded-sm border border-indigo-100/30 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950 font-sans">
+                <span className="w-4 h-4 bg-indigo-100 text-indigo-800 rounded-full flex items-center justify-center text-[10px] font-mono">1</span>
+                <span>{language === 'es' ? 'El Sobre Seguro' : 'The Safe Envelope'}</span>
+              </div>
+              <p className="text-[11px] text-gray-600 leading-normal">
+                {language === 'es' 
+                  ? 'Ciframos su archivo para meterlo en un "sobre digital" inviolable. Solo el destinatario que usted elija posee la clave exacta para poder abrirlo.' 
+                  : 'We encrypt your file, placing it in an unbreakable "digital envelope". Only your chosen recipient holds the key required to open it.'}
+              </p>
+            </div>
+
+            {/* Step 2: El Candado Cuántico */}
+            <div className="space-y-1 bg-white/85 p-3.5 rounded-sm border border-indigo-100/30 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950 font-sans">
+                <span className="w-4 h-4 bg-indigo-100 text-indigo-800 rounded-full flex items-center justify-center text-[10px] font-mono">2</span>
+                <span>{language === 'es' ? 'Candado Cuántico' : 'Quantum Lock'}</span>
+              </div>
+              <p className="text-[11px] text-gray-600 leading-normal">
+                {language === 'es' 
+                  ? 'Cerramos el sobre usando un chip cuántico físico real de IonQ. Funciona como un candado con infinitas combinaciones generadas por átomos, indescifrable.' 
+                  : 'We lock the envelope using a real physical IonQ quantum chip. It works like a padlock with infinite atom-generated combinations, uncrackable.'}
+              </p>
+            </div>
+
+            {/* Step 3: El Libro Notarial */}
+            <div className="space-y-1 bg-white/85 p-3.5 rounded-sm border border-indigo-100/30 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950 font-sans">
+                <span className="w-4 h-4 bg-indigo-100 text-indigo-800 rounded-full flex items-center justify-center text-[10px] font-mono">3</span>
+                <span>{language === 'es' ? 'Notario Digital' : 'Digital Notary'}</span>
+              </div>
+              <p className="text-[11px] text-gray-600 leading-normal">
+                {language === 'es' 
+                  ? 'Escribimos el envío en Stellar, un libro de actas digital público e imborrable. Así se certifica el segundo exacto del envío y quién es su emisor.' 
+                  : 'We write the dispatch in Stellar, an unerasable public digital ledger. This certifies the exact second of dispatch and who the sender is.'}
+              </p>
+            </div>
+
+            {/* Step 4: Firma de Acuse */}
+            <div className="space-y-1 bg-white/85 p-3.5 rounded-sm border border-indigo-100/30 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950 font-sans">
+                <span className="w-4 h-4 bg-indigo-100 text-indigo-800 rounded-full flex items-center justify-center text-[10px] font-mono">4</span>
+                <span>{language === 'es' ? 'Firma de Recibo' : 'Receipt Signature'}</span>
+              </div>
+              <p className="text-[11px] text-gray-600 leading-normal">
+                {language === 'es' 
+                  ? 'Si activa la firma requerida, el receptor estará obligado a firmar digitalmente con su PIN para confirmar que recibió la prueba original e intacta.' 
+                  : 'If you enable the signature requirement, the recipient is forced to digitally sign with their PIN to confirm they received the original, untouched file.'}
+              </p>
+            </div>
+
+          </div>
+        )}
       </div>
 
       {/* Main Grid: Clean Judicial Form on Left | Judicial Audit Timeline on Right */}
@@ -434,9 +535,71 @@ export const Dashboard: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">
-                  {language === 'es' ? 'Especifique el juzgado, fiscalía o perito receptor de esta evidencia confidencial.' : 'Specify the court, prosecutor, or expert recipient of this confidential evidence.'}
+                <p className="text-[11px] text-gray-500 mt-1 leading-normal">
+                  {language === 'es' 
+                    ? '¿Quién recibirá este sobre? Indique la fiscalía, juzgado o perito autorizado. Solo esta cuenta podrá descifrar y abrir la evidencia.' 
+                    : 'Who will receive this envelope? Specify the authorized court, prosecutor, or colleague. Only this account will be able to decrypt and open the evidence.'}
                 </p>
+
+                {/* Visual Recipient Verification Confirmation Badge */}
+                {(() => {
+                  const matchedUser = registeredUsers.find(u => u.username.toLowerCase() === selectedRecipientUsername.toLowerCase() || u.username.toLowerCase() === destinatario.trim().toLowerCase());
+                  if (matchedUser) {
+                    const fullName = matchedUser.profile ? `${matchedUser.profile.nombres} ${matchedUser.profile.apellidos}` : matchedUser.username;
+                    const matricula = matchedUser.profile?.matricula || '';
+                    const jurisdiccion = matchedUser.profile?.jurisdiccion || '';
+                    const cargo = matchedUser.profile?.cargo || '';
+                    return (
+                      <div className="mt-2 p-2.5 bg-emerald-50 border border-emerald-100 rounded-sm flex items-start gap-2.5 text-left">
+                        <div className="p-1 bg-emerald-500 text-white rounded-full mt-0.5">
+                          <Check size={10} className="stroke-[3]" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-bold text-emerald-900 font-sans flex items-center gap-1.5 flex-wrap">
+                            {language === 'es' ? 'Destinatario Verificado y Autorizado' : 'Verified & Authorized Recipient'}
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm font-mono font-semibold">
+                              {matchedUser.username}
+                            </span>
+                          </p>
+                          <p className="text-[11px] text-emerald-800 font-sans">
+                            <span className="font-semibold">{fullName}</span>
+                            {matricula && ` | M.P.: ${matricula}`}
+                          </p>
+                          {(cargo || jurisdiccion) && (
+                            <p className="text-[10px] text-emerald-700/80 font-sans">
+                              {cargo} {jurisdiccion ? `(${jurisdiccion})` : ''}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Checkbox: Requiere Firma */}
+                <div className="mt-3 flex items-start gap-2.5 bg-gray-50/50 border border-[#eaeaea] p-3 rounded-sm" id="requires-signature-wrapper">
+                  <input
+                    type="checkbox"
+                    id="requires-signature-checkbox"
+                    checked={requiresSignature}
+                    onChange={(e) => setRequiresSignature(e.target.checked)}
+                    className="w-4 h-4 accent-black cursor-pointer rounded-sm mt-0.5"
+                    disabled={isRunning}
+                  />
+                  <div className="flex flex-col text-left">
+                    <label htmlFor="requires-signature-checkbox" className="text-[11px] font-sans text-gray-800 cursor-pointer font-bold select-none leading-tight">
+                      {language === 'es' 
+                        ? 'Enviar con acuse de recibo obligatorio (Firma Digital)' 
+                        : 'Send with mandatory delivery confirmation (Digital Signature)'}
+                    </label>
+                    <span className="text-[10px] text-gray-500 mt-0.5 leading-normal">
+                      {language === 'es'
+                        ? 'El receptor deberá ingresar su huella o PIN para firmar y desbloquear el sobre, registrando la recepción conforme en Stellar.'
+                        : 'The recipient will be required to enter their passkey or PIN to sign and unlock the envelope, logging the clean receipt in Stellar.'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Field 2: Documento / Evidencia (Recuadro Gris Sutil) */}
@@ -528,6 +691,15 @@ export const Dashboard: React.FC = () => {
                     </button>
                   </div>
                 )}
+
+                <div className="mt-2.5 p-2 bg-blue-50/40 border border-blue-100/50 rounded-sm flex items-start gap-2 text-[10px] text-blue-800 font-sans">
+                  <Info size={13} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                  <p className="leading-normal">
+                    {language === 'es' 
+                      ? 'Protección Automática: Su archivo se codifica de manera segura en su computadora antes de enviarse. Viajará totalmente cerrado y nadie en internet podrá leerlo.'
+                      : 'Automatic Protection: Your file is securely encoded on your computer before sending. It travels fully sealed and no one on the internet can read it.'}
+                  </p>
+                </div>
               </div>
 
               {/* Optional notes */}
@@ -588,17 +760,17 @@ export const Dashboard: React.FC = () => {
               {!isRunning && !manifestResult ? (
                 /* Welcome / Ready State */
                 <div className="py-8 text-center space-y-4">
-                  <div className="w-12 h-12 bg-[#fafafa] border border-[#eaeaea] text-gray-400 flex items-center justify-center rounded-sm mx-auto">
+                  <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center rounded-sm mx-auto shadow-2xs">
                     <FileCheck2 size={24} />
                   </div>
                   <div className="max-w-sm mx-auto space-y-2">
                     <h3 className="font-sans font-bold text-xs text-gray-900 uppercase tracking-wider">
-                      {language === 'es' ? 'Sistema Listo para Procesar' : 'System Ready to Process'}
+                      {language === 'es' ? 'Secuenciador Listo para Sellar' : 'Sequencer Ready to Seal'}
                     </h3>
                     <p className="text-xs text-gray-500 leading-relaxed">
                       {language === 'es' 
-                        ? 'Complete los datos del destinatario y cargue el reporte pericial. El sistema iniciará la secuencia de sellado físico QRNG de IonQ y el anclaje inmutable en el ledger global descentralizado de Stellar.' 
-                        : 'Complete authorized recipient details and upload evidence. The system will start the physical QRNG sealing sequence using IonQ hardware and immutable anchoring on the decentralized Stellar ledger.'}
+                        ? 'Al presionar "Iniciar", el sistema convertirá automáticamente su reporte en un sobre digital cerrado, lo sellará usando la aleatoriedad física de un chip cuántico IonQ, y grabará la prueba de entrega inalterable en Stellar.' 
+                        : 'Upon clicking "Start", the system will automatically pack your report into a sealed digital envelope, lock it using real physical IonQ quantum randomness, and record an unalterable proof of delivery on Stellar.'}
                     </p>
                   </div>
                 </div>
@@ -619,12 +791,12 @@ export const Dashboard: React.FC = () => {
                     </div>
                     <div>
                       <p className={`text-xs font-bold leading-none ${steps.step1 === 'running' ? 'text-black' : steps.step1 === 'success' ? 'text-gray-900' : 'text-gray-400'}`}>
-                        {language === 'es' ? '[Paso 1] Verificando integridad del archivo' : '[Step 1] Verifying file integrity'}
+                        {language === 'es' ? 'Paso 1: Huella de Seguridad (SHA3-256)' : 'Step 1: Security Fingerprint (SHA3-256)'}
                       </p>
                       <p className="text-[11px] text-gray-500 mt-1 leading-normal font-sans">
                         {language === 'es' 
-                          ? 'Calculando huella digital única (SHA3-256) del documento original.' 
-                          : 'Calculating unique digital fingerprint (SHA3-256) of original document.'}
+                          ? 'Calculando el código de identidad único del archivo. Si alguien cambia una sola coma, este código cambiará, alertándonos de inmediato.' 
+                          : 'Calculating the unique file identity code. If anyone alters a single comma, this code will change, instantly alerting us.'}
                       </p>
                     </div>
                   </div>
@@ -642,12 +814,12 @@ export const Dashboard: React.FC = () => {
                     </div>
                     <div>
                       <p className={`text-xs font-bold leading-none ${steps.step2 === 'running' ? 'text-black' : steps.step2 === 'success' ? 'text-gray-900' : 'text-gray-400'}`}>
-                        {language === 'es' ? '[Paso 2] Generando sello de seguridad física' : '[Step 2] Generating physical security seal'}
+                        {language === 'es' ? 'Paso 2: Generación de Candado Cuántico' : 'Step 2: Quantum Key Fabrication'}
                       </p>
                       <p className="text-[11px] text-gray-500 mt-1 leading-normal font-sans">
                         {language === 'es' 
-                          ? 'Consumiendo claves de alta densidad generadas mediante el hardware cuántico IonQ.' 
-                          : 'Consuming high-density keys generated via physical IonQ quantum hardware.'}
+                          ? 'Usando un chip cuántico IonQ de átomos suspendidos para crear una llave secreta física 100% indescifrable ante supercomputadoras.' 
+                          : 'Using an IonQ quantum chip of suspended atoms to fabricate a 100% physically random key, uncrackable by supercomputers.'}
                       </p>
                     </div>
                   </div>
@@ -665,12 +837,12 @@ export const Dashboard: React.FC = () => {
                     </div>
                     <div>
                       <p className={`text-xs font-bold leading-none ${steps.step3 === 'running' ? 'text-black' : steps.step3 === 'success' ? 'text-gray-900' : 'text-gray-400'}`}>
-                        {language === 'es' ? '[Paso 3] Aplicando blindaje de privacidad' : '[Step 3] Applying privacy shielding'}
+                        {language === 'es' ? 'Paso 3: Blindaje del Sobre Digital' : 'Step 3: Shielding the Digital Envelope'}
                       </p>
                       <p className="text-[11px] text-gray-500 mt-1 leading-normal font-sans">
                         {language === 'es' 
-                          ? 'Cifrando el contenido con protección poscuántica (ML-KEM-768) a prueba de filtraciones futuras.' 
-                          : 'Encrypting content with post-quantum security (ML-KEM-768) to protect against future breaches.'}
+                          ? 'Guardando su archivo dentro de un bloque encriptado de grado militar (estándar NIST ML-KEM) que solo el destinatario podrá abrir.' 
+                          : 'Sealing your file inside a military-grade encrypted envelope (NIST ML-KEM standard) that only your recipient can unlock.'}
                       </p>
                     </div>
                   </div>
@@ -688,12 +860,12 @@ export const Dashboard: React.FC = () => {
                     </div>
                     <div>
                       <p className={`text-xs font-bold leading-none ${steps.step4 === 'running' ? 'text-black' : steps.step4 === 'success' ? 'text-gray-900' : 'text-gray-400'}`}>
-                        {language === 'es' ? '[Paso 4] Registrando acta digital inmutable' : '[Step 4] Registering immutable digital record'}
+                        {language === 'es' ? 'Paso 4: Notarización en Libro de Actas' : 'Step 4: Notarization in Digital Ledger'}
                       </p>
                       <p className="text-[11px] text-gray-500 mt-1 leading-normal font-sans">
                         {language === 'es' 
-                          ? 'Anclando la marca de tiempo e historial de evidencia en la red global descentralizada Stellar.' 
-                          : 'Anchoring timestamp and evidence logs into the global decentralized Stellar ledger.'}
+                          ? 'Anclando el registro de envío de forma permanente e imborrable en el gran libro de actas digital público Stellar.' 
+                          : 'Anchoring the dispatch record permanently and unerasably in the public Stellar digital notary book.'}
                       </p>
                     </div>
                   </div>
@@ -706,12 +878,12 @@ export const Dashboard: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-xs font-bold text-gray-900 leading-none">
-                          {language === 'es' ? '[Final] Envío Exitoso.' : '[Final] Successful transmission.'}
+                          {language === 'es' ? '¡Envío y Notarización Completados!' : 'Dispatch & Notarization Complete!'}
                         </p>
                         <p className="text-[11px] text-emerald-600 font-semibold mt-1 font-sans">
                           {language === 'es' 
-                            ? 'Certificado de cadena de custodia generado correctamente y anclado.' 
-                            : 'Chain of custody certificate successfully generated and anchored.'}
+                            ? 'El sobre de evidencia fue cerrado correctamente, registrado en Stellar y ya está listo para el receptor.' 
+                            : 'The evidence envelope was successfully sealed, registered in Stellar, and is now ready for the recipient.'}
                         </p>
                       </div>
                     </div>
@@ -835,7 +1007,7 @@ export const Dashboard: React.FC = () => {
                     <span className={`w-1.5 h-1.5 rounded-full ${manifestResult.quantumSource.isSimulated ? 'bg-amber-400' : 'bg-emerald-500'}`} />
                     <p className="text-xs font-bold text-[#111111] leading-tight">
                       {manifestResult.quantumSource.isSimulated 
-                        ? (language === 'es' ? 'QPU Virtual (Simulado)' : 'Virtual QPU (Simulated)') 
+                        ? (language === 'es' ? 'QPU Virtual (Local)' : 'Virtual QPU (Local)') 
                         : (language === 'es' ? 'QPU Física IonQ' : 'Physical IonQ QPU')}
                     </p>
                   </div>
@@ -956,12 +1128,19 @@ export const Dashboard: React.FC = () => {
                       href={`https://stellar.expert/explorer/${manifestResult.stellarNotarization.network === 'public' ? 'public' : 'testnet'}/tx/${manifestResult.stellarNotarization.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline font-semibold font-sans text-[8px] whitespace-nowrap"
+                      className="text-blue-600 hover:underline font-semibold font-sans text-[8px] whitespace-nowrap animate-pulse"
                     >
                       {t.viewInExplorer} →
                     </a>
                   )}
                 </div>
+                {manifestResult.stellarNotarization?.isSimulated !== false && (
+                  <div className="text-[9px] text-amber-700 bg-amber-50/50 p-1.5 rounded-sm border border-amber-100/30 font-sans leading-normal mt-2 text-left">
+                    {language === 'es' 
+                      ? '⚠️ Sello de Demostración: Registro virtual local. No figurará en el explorador de Stellar real.'
+                      : '⚠️ Demo Seal: Virtual local registration. It will not appear in the live Stellar explorer.'}
+                  </div>
+                )}
               </div>
 
               {/* Card 6: Certified Forensic Expert / Perito */}

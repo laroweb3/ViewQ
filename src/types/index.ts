@@ -24,6 +24,7 @@ export interface StellarNotarization {
   network: 'testnet' | 'public';
   timestamp: string;
   memo: string;
+  isSimulated?: boolean;
 }
 
 export interface SealingManifest {
@@ -73,6 +74,13 @@ export interface VaultRecord {
   viewQFileBase64?: string; // Encrypted .viewQ file in base64/dataurl
   destinatario?: string;
   recipientUsername?: string;
+  requiresSignature?: boolean;
+  signatureStatus?: 'pending' | 'signed' | 'not_required';
+  signatureTimestamp?: string;
+  signatureStellarTxHash?: string;
+  signatureIsSimulated?: boolean;
+  signerName?: string;
+  creator?: string;
 }
 
 export interface AppNotification {
@@ -89,6 +97,12 @@ export interface AppNotification {
   status: 'unread' | 'read';
   stellarTxHash?: string;
   ledger?: number;
+  requiresSignature?: boolean;
+  signatureStatus?: 'pending' | 'signed' | 'not_required';
+  signatureTimestamp?: string;
+  signatureStellarTxHash?: string;
+  signatureIsSimulated?: boolean;
+  signerName?: string;
 }
 
 export interface EphemeralShare {
@@ -129,6 +143,7 @@ export interface RegisteredUser {
   status: 'pending' | 'approved' | 'rejected';
   profile?: UserProfile;
   registeredAt: string;
+  pin?: string;
 }
 
 

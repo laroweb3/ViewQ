@@ -61,17 +61,17 @@ const MainLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex text-gray-900 selection:bg-black/5 overflow-x-hidden">
+    <div className="h-screen w-screen flex bg-[#fafafa] text-gray-900 selection:bg-black/5 overflow-hidden">
       {/* Collapsible Left Navigation Sidebar */}
       <Sidebar />
 
       {/* Main Content Area */}
       <main 
         id="main-viewport"
-        className="flex-1 min-w-0 min-h-screen flex flex-col transition-all duration-300 ease-in-out pl-0 overflow-x-hidden"
+        className="flex-1 min-w-0 h-full flex flex-col transition-all duration-300 ease-in-out overflow-hidden"
       >
         {/* Top Header Spacing Padding for mobile toggles */}
-        <div className="h-16 md:h-0 w-full flex-shrink-0" />
+        <div className="h-16 md:hidden w-full flex-shrink-0" />
 
         {/* Firestore Offline & Quota Warning Banner */}
         {firestoreStatus !== 'online' && (

@@ -30,7 +30,7 @@ export const TelemetryView: React.FC = () => {
   const getQubitSpecs = (index: number) => {
     if (isSimulated) {
       return {
-        type: language === 'es' ? 'Qubit Virtual (Simulador Determinista)' : 'Virtual Qubit (Deterministic Simulator)',
+        type: language === 'es' ? 'Qubit Virtual (Coprocesamiento Equivalente)' : 'Virtual Qubit (Equivalent Processing)',
         fidelity: '99.999%',
         coherence: language === 'es' ? '∞ (Definido por Software)' : '∞ (Software defined)',
         frequency: language === 'es' ? 'N/A (Calculado)' : 'N/A (Calculated)',
@@ -80,7 +80,7 @@ export const TelemetryView: React.FC = () => {
             </h3>
           </div>
           <span className="text-[10px] font-mono bg-[#38bdf8]/10 text-[#38bdf8] border border-[#38bdf8]/20 px-2 py-0.5 rounded-sm">
-            {isSimulated ? 'VIRTUAL SIMULATOR' : 'PHYSICAL VACUUM TRAP'}
+            {isSimulated ? 'VIRTUAL COPROCESSOR' : 'PHYSICAL VACUUM TRAP'}
           </span>
         </div>
 

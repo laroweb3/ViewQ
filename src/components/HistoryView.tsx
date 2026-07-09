@@ -21,11 +21,18 @@ import {
   EyeOff,
   Calendar,
   Search,
-  X
+  X,
+  Globe,
+  Sparkles,
+  User,
+  UserCheck,
+  PenTool,
+  HelpCircle,
+  Activity
 } from 'lucide-react';
 
 export const HistoryView: React.FC = () => {
-  const { vaults, deleteVault, addLog, language, resolveFilePayload } = useApp();
+  const { vaults, deleteVault, addLog, language, resolveFilePayload, registeredUsers, user } = useApp();
   const t = translations[language];
   
   const [selectedVault, setSelectedVault] = useState<VaultRecord | null>(null);
@@ -34,11 +41,34 @@ export const HistoryView: React.FC = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [decryptError, setDecryptError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [inspectorTab, setInspectorTab] = useState<'roadmap' | 'technical'>('roadmap');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'sim' | 'qpu'>('all');
 
-  const filteredVaults = vaults.filter(record => {
+  const myVaults = vaults.filter(record => {
+    if (!user) return false;
+    const usernameLower = user.username.toLowerCase();
+    
+    // 1. Is the user the explicit creator?
+    if (record.creator && record.creator.toLowerCase() === usernameLower) return true;
+    
+    // 2. Or is the user the certified perito (fallback)?
+    if (record.manifest?.certifiedBy && record.manifest.certifiedBy.email === user.profile?.email) return true;
+    
+    // 3. Or was it sent/shared with the user?
+    if (record.recipientUsername && record.recipientUsername.toLowerCase() === usernameLower) return true;
+    if (record.destinatario && record.destinatario.toLowerCase() === usernameLower) return true;
+    
+    // 4. Old or demo vault
+    if (record.id === 'vault-demo-1') {
+      return usernameLower === 'laro';
+    }
+
+    return false;
+  });
+
+  const filteredVaults = myVaults.filter(record => {
     const term = searchTerm.toLowerCase();
     const matchesSearch = 
       record.title.toLowerCase().includes(term) ||
@@ -184,7 +214,7 @@ export const HistoryView: React.FC = () => {
         </div>
         <div className="flex items-center gap-2 text-xs font-sans text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-sm">
           <Database size={14} className="text-gray-400" />
-          <span>{language === 'es' ? 'EXPEDIENTES ACTIVOS: ' : 'ACTIVE CASE RECORDS: '}<strong className="text-black font-semibold">{vaults.length}</strong></span>
+          <span>{language === 'es' ? 'EXPEDIENTES ACTIVOS: ' : 'ACTIVE CASE RECORDS: '}<strong className="text-black font-semibold">{myVaults.length}</strong></span>
         </div>
       </div>
 
@@ -253,7 +283,7 @@ export const HistoryView: React.FC = () => {
                 }`}
                 id="filter-sim-btn"
               >
-                {language === 'es' ? 'Simulados' : 'Simulated'}
+                {language === 'es' ? 'Virtuales' : 'Virtual'}
               </button>
             </div>
             
@@ -262,8 +292,8 @@ export const HistoryView: React.FC = () => {
               <div className="text-[10px] text-gray-500 font-sans flex justify-between items-center bg-gray-50 px-2.5 py-1 rounded-sm border border-gray-100">
                 <span>
                   {language === 'es' 
-                    ? `Encontrados: ${filteredVaults.length} de ${vaults.length}` 
-                    : `Found: ${filteredVaults.length} of ${vaults.length}`}
+                    ? `Encontrados: ${filteredVaults.length} de ${myVaults.length}` 
+                    : `Found: ${filteredVaults.length} of ${myVaults.length}`}
                 </span>
                 <button 
                   onClick={() => {
@@ -279,7 +309,7 @@ export const HistoryView: React.FC = () => {
             )}
           </div>
 
-          {vaults.length === 0 ? (
+          {myVaults.length === 0 ? (
             <div className="border border-[#eaeaea] rounded-sm p-8 text-center text-gray-400 bg-[#fafafa]">
               <Database size={24} className="mx-auto text-gray-300 mb-2" />
               <p className="text-xs font-semibold text-gray-600">{language === 'es' ? 'Bóveda vacía' : 'Vault empty'}</p>
@@ -327,7 +357,7 @@ export const HistoryView: React.FC = () => {
                 >
                   <div className="flex justify-between items-start gap-2 mb-2">
                     <span className="text-[10px] font-mono font-semibold text-gray-400 uppercase tracking-wider block">
-                      {record.manifest.quantumSource.isSimulated ? (language === 'es' ? 'Local Sim' : 'Local Sim') : (language === 'es' ? 'QPU Remoto' : 'Remote QPU')}
+                      {record.manifest.quantumSource.isSimulated ? (language === 'es' ? 'Virtual Local' : 'Virtual Local') : (language === 'es' ? 'QPU Remoto' : 'Remote QPU')}
                     </span>
                     <button
                       onClick={(e) => handleDelete(record.id, e)}
@@ -435,44 +465,325 @@ export const HistoryView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Technical Sealing Metadata */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
-                <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
-                  <span className="text-[9px] font-mono uppercase text-gray-400 block font-semibold">
-                    {language === 'es' ? 'DISPOSITIVO DE ENTROPÍA' : 'ENTROPY DEVICE'}
-                  </span>
-                  <p className="text-xs font-semibold text-gray-900 truncate">
-                    {selectedVault.manifest.quantumSource.provider}
-                  </p>
-                  <p className="text-[10px] font-mono text-gray-400 truncate">
-                    Target: {selectedVault.manifest.quantumSource.target}
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
-                  <span className="text-[9px] font-mono uppercase text-gray-400 block font-semibold">
-                    {language === 'es' ? 'ESTÁNDAR KEM SELECCIONADO' : 'SELECTED KEM STANDARD'}
-                  </span>
-                  <p className="text-xs font-semibold text-gray-900 truncate">
-                    {selectedVault.manifest.algorithm.kem}
-                  </p>
-                  <p className="text-[10px] text-gray-400 font-mono">
-                    {language === 'es' ? 'Parámetros: k=3, q=3329' : 'Parameters: k=3, q=3329'}
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
-                  <span className="text-[9px] font-mono uppercase text-gray-400 block font-semibold">
-                    {language === 'es' ? 'HASH DE INTEGRIDAD PRE/POST' : 'PRE/POST INTEGRITY HASH'}
-                  </span>
-                  <p className="text-xs font-mono font-semibold text-gray-900 truncate" title={selectedVault.manifest.payload.sha3Hash}>
-                    {selectedVault.manifest.payload.sha3Hash.slice(0, 16)}...
-                  </p>
-                  <p className="text-[10px] text-gray-400 font-mono uppercase">
-                    ALGORITMO: SHA3-256
-                  </p>
-                </div>
+              {/* Inspector Tabs Switcher */}
+              <div className="flex border-b border-[#eaeaea]" id="inspector-tabs-container">
+                <button
+                  type="button"
+                  onClick={() => setInspectorTab('roadmap')}
+                  className={`flex-1 pb-3 text-center text-xs font-sans font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                    inspectorTab === 'roadmap'
+                      ? 'border-black text-black'
+                      : 'border-transparent text-gray-400 hover:text-black'
+                  }`}
+                  id="tab-btn-roadmap"
+                >
+                  {language === 'es' ? 'Camino de Custodia (Simple)' : 'Custody Roadmap (Simple)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectorTab('technical')}
+                  className={`flex-1 pb-3 text-center text-xs font-sans font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                    inspectorTab === 'technical'
+                      ? 'border-black text-black'
+                      : 'border-transparent text-gray-400 hover:text-black'
+                  }`}
+                  id="tab-btn-technical"
+                >
+                  {language === 'es' ? 'Detalles Técnicos (Avanzado)' : 'Technical Details (Advanced)'}
+                </button>
               </div>
+
+              {/* Tab 1: Visual Custody Roadmap */}
+              {inspectorTab === 'roadmap' && (() => {
+                const recipientUser = registeredUsers.find(u => 
+                  u.username.toLowerCase() === (selectedVault.recipientUsername || '').toLowerCase() ||
+                  u.username.toLowerCase() === (selectedVault.destinatario || '').toLowerCase() ||
+                  (u.profile && `${u.profile.nombres} ${u.profile.apellidos}`.toLowerCase() === (selectedVault.destinatario || '').toLowerCase())
+                );
+
+                const dateString = new Date(selectedVault.timestamp).toLocaleString(language === 'es' ? 'es-ES' : 'en-US');
+                const sigDateString = selectedVault.signatureTimestamp 
+                  ? new Date(selectedVault.signatureTimestamp).toLocaleString(language === 'es' ? 'es-ES' : 'en-US')
+                  : '';
+
+                return (
+                  <div className="space-y-6 pt-2 animate-fadeIn text-left">
+                    
+                    {/* Visual Vertical Timeline */}
+                    <div className="relative border-l-2 border-gray-100 ml-4 pl-6 space-y-7">
+                      
+                      {/* Step 1: Origin / Creation */}
+                      <div className="relative">
+                        {/* Dot */}
+                        <div className="absolute -left-[31px] top-0.5 bg-black text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                          <User size={10} />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-gray-900 font-sans">
+                              {language === 'es' ? '1. Creación del Sobre y Resguardo' : '1. Envelope Creation & Safeguard'}
+                            </h4>
+                            <span className="text-[9px] bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-sm font-semibold uppercase">
+                              {language === 'es' ? 'COMPLETADO' : 'COMPLETED'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-600 font-sans leading-relaxed">
+                            {language === 'es' 
+                              ? 'La evidencia original fue empaquetada dentro de un sobre digital hermético. Se calculó su huella digital única e inalterable SHA3-256 en su navegador.'
+                              : 'The original evidence was packed inside an airtight digital envelope. Its unique, unaltered SHA3-256 digital fingerprint was calculated in your browser.'}
+                          </p>
+                          <div className="text-[10px] text-gray-400 font-mono flex items-center gap-3">
+                            <span>{dateString}</span>
+                            <span className="truncate max-w-[200px]" title={selectedVault.manifest.payload.sha3Hash}>
+                              Hash: {selectedVault.manifest.payload.sha3Hash.slice(0, 12)}...
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 2: Quantum Sealing */}
+                      <div className="relative">
+                        {/* Dot */}
+                        <div className="absolute -left-[31px] top-0.5 bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                          <Sparkles size={10} />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-indigo-950 font-sans">
+                              {language === 'es' ? '2. Sellado de Seguridad Física Cuántica' : '2. Quantum Physical Safety Seal'}
+                            </h4>
+                            <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-sm font-semibold uppercase">
+                              {language === 'es' ? 'BLOQUEADO' : 'SECURED'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-600 font-sans leading-relaxed">
+                            {language === 'es' 
+                              ? `Se forjó un candado indescifrable mediante claves cuánticas de alta entropía procedentes del procesador de átomos suspendidos de IonQ (${selectedVault.manifest.quantumSource.target.replace('ionq.', '')}).`
+                              : `An unbreakable padlock was forged using high-entropy quantum keys from the IonQ suspended-atom processor (${selectedVault.manifest.quantumSource.target.replace('ionq.', '')}).`}
+                          </p>
+                          <div className="text-[10px] text-gray-400 font-mono flex items-center gap-3">
+                            <span>{dateString}</span>
+                            <span className="truncate max-w-[200px]" title={selectedVault.manifest.quantumSource.quantumSeed}>
+                              Seed: {selectedVault.manifest.quantumSource.quantumSeed.slice(0, 12)}...
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 3: Ledger Notarization */}
+                      <div className="relative">
+                        {/* Dot */}
+                        <div className="absolute -left-[31px] top-0.5 bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                          <Globe size={10} />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-blue-950 font-sans">
+                              {language === 'es' ? '3. Acta de Entrega e Inmutabilidad Stellar' : '3. Immutable Record on Stellar'}
+                            </h4>
+                            <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-sm font-semibold uppercase">
+                              {language === 'es' ? 'NOTARIZADO' : 'NOTARIZED'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-600 font-sans leading-relaxed">
+                            {language === 'es' 
+                              ? 'La marca de tiempo de despacho se grabó permanentemente en el libro público Stellar, sirviendo como un testigo imparcial independiente.'
+                              : 'The dispatch timestamp was permanently recorded in the public Stellar ledger, serving as an independent, impartial third-party witness.'}
+                          </p>
+                          <div className="text-[10px] text-gray-400 font-mono flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span>{dateString}</span>
+                            {selectedVault.manifest.stellarNotarization ? (
+                              <div className="space-y-1">
+                                <a 
+                                  href={`https://stellar.expert/explorer/testnet/tx/${selectedVault.manifest.stellarNotarization.txHash}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline font-bold flex items-center gap-0.5 animate-pulse"
+                                >
+                                  {language === 'es' ? 'Ver Ledger Stellar' : 'View Stellar Ledger'} →
+                                </a>
+                                {selectedVault.manifest.stellarNotarization.isSimulated !== false && (
+                                  <div className="text-[10px] text-amber-700 font-sans font-normal normal-case leading-normal max-w-lg">
+                                    {language === 'es' 
+                                      ? '⚠️ Sello Virtual de Demostración: Esta transacción se generó localmente de manera simulada porque no hay llaves de Stellar reales configuradas. No figurará en el explorador público. Configure su "STELLAR_SOURCE_SECRET" en la pestaña de Configuración para notarizaciones reales.'
+                                      : '⚠️ Simulated/Virtual Seal: This transaction was generated locally because no real Stellar keys are configured in Settings. It will not appear on the public blockchain explorer. Configure "STELLAR_SOURCE_SECRET" in the Settings tab for live notarizations.'}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="italic">{language === 'es' ? 'Transmisión directa registrada' : 'Direct registry logged'}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 4: Recipient Intervenors & Signature */}
+                      <div className="relative">
+                        {/* Dot */}
+                        {selectedVault.signatureStatus === 'signed' ? (
+                          <div className="absolute -left-[31px] top-0.5 bg-emerald-600 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                            <UserCheck size={10} />
+                          </div>
+                        ) : selectedVault.signatureStatus === 'pending' ? (
+                          <div className="absolute -left-[31px] top-0.5 bg-amber-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                            <Clock size={10} className="animate-pulse" />
+                          </div>
+                        ) : (
+                          <div className="absolute -left-[31px] top-0.5 bg-gray-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                            <Check size={10} />
+                          </div>
+                        )}
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-xs font-bold text-gray-900 font-sans">
+                              {language === 'es' ? '4. Recepción y Validación del Destinatario' : '4. Recipient Validation & Signature'}
+                            </h4>
+                            
+                            {selectedVault.signatureStatus === 'signed' && (
+                              <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm font-semibold uppercase">
+                                {language === 'es' ? 'FIRMADO Y ENTREGADO' : 'SIGNED & DELIVERED'}
+                              </span>
+                            )}
+                            {selectedVault.signatureStatus === 'pending' && (
+                              <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-sm font-semibold uppercase animate-pulse">
+                                {language === 'es' ? 'ESPERANDO FIRMA DEL RECEPTOR' : 'WAITING FOR SIGNATURE'}
+                              </span>
+                            )}
+                            {selectedVault.signatureStatus === 'not_required' && (
+                              <span className="text-[9px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-sm font-semibold uppercase">
+                                {language === 'es' ? 'ENTREGA INMEDIATA ABIERTA' : 'OPEN IMMEDIATE DELIVERY'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Recipient Profile Details */}
+                          <div className="bg-gray-50/70 border border-gray-100 rounded-sm p-3 space-y-1 text-xs">
+                            <div className="flex items-center gap-2">
+                              <User size={13} className="text-gray-400" />
+                              <span className="font-bold text-gray-800 font-sans">
+                                {recipientUser ? `${recipientUser.profile?.nombres} ${recipientUser.profile?.apellidos}` : (selectedVault.destinatario || selectedVault.recipientUsername || 'Externo / Desconocido')}
+                              </span>
+                              <span className="text-[10px] text-gray-400 font-mono">
+                                (@{selectedVault.recipientUsername || selectedVault.destinatario || 'external'})
+                              </span>
+                            </div>
+
+                            {recipientUser?.profile && (
+                              <div className="text-[11px] text-gray-500 font-sans space-y-0.5 pl-5">
+                                <p>
+                                  <span className="font-semibold">{language === 'es' ? 'Matrícula Profesional' : 'Professional License'}:</span>{' '}
+                                  <strong className="text-black font-semibold">{recipientUser.profile.matricula}</strong>
+                                </p>
+                                <p>
+                                  <span className="font-semibold">{language === 'es' ? 'Cargo y Fuero' : 'Position & Court'}:</span>{' '}
+                                  {recipientUser.profile.cargo} en {recipientUser.profile.jurisdiccion}
+                                </p>
+                              </div>
+                            )}
+
+                            {!recipientUser && selectedVault.destinatario && (
+                              <p className="text-[10px] text-gray-400 italic pl-5">
+                                {language === 'es' ? 'Entrega dirigida a oficina externa o correo manual.' : 'Delivery directed to external office or manual email.'}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Action Info or Signature Record */}
+                          <p className="text-[11px] text-gray-600 font-sans leading-relaxed">
+                            {selectedVault.signatureStatus === 'signed' ? (
+                              language === 'es'
+                                ? `El receptor ingresó su PIN de seguridad, verificó la integridad matemática del archivo y estampó su firma digital certificada en el ledger Stellar.`
+                                : `The recipient entered their security PIN, verified the mathematical file integrity, and stamped their certified digital signature on the Stellar ledger.`
+                            ) : selectedVault.signatureStatus === 'pending' ? (
+                              language === 'es'
+                                ? `El sobre permanece bloqueado de forma segura en tránsito. Solo el destinatario listado arriba puede desbloquearlo y validar la firma con sus credenciales autorizadas en la pestaña 'Recibidos'.`
+                                : `The envelope remains securely locked in transit. Only the listed recipient can unlock it and validate the signature with their authorized credentials under the 'Received' tab.`
+                            ) : (
+                              language === 'es'
+                                ? `No se especificó firma obligatoria para este expediente. El destinatario puede realizar el descapsulado y abrir la evidencia directamente.`
+                                : `No mandatory signature was specified for this case file. The recipient can decapsulate and open the evidence directly.`
+                            )}
+                          </p>
+
+                          {selectedVault.signatureStatus === 'signed' && (
+                            <div className="text-[10px] text-emerald-700 font-mono flex flex-wrap items-center gap-x-3 gap-y-1 bg-emerald-50/50 p-2 rounded-sm border border-emerald-100/50">
+                              <span className="flex items-center gap-1 font-bold">
+                                <Check size={11} className="stroke-[3]" />
+                                {language === 'es' ? 'RECIBIDO Y FIRMADO EL:' : 'RECEIVED & SIGNED ON:'} {sigDateString}
+                              </span>
+                              {selectedVault.signatureStellarTxHash && (
+                                <div className="space-y-1 block w-full mt-1">
+                                  <a 
+                                    href={`https://stellar.expert/explorer/testnet/tx/${selectedVault.signatureStellarTxHash}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-emerald-700 hover:underline font-bold flex items-center gap-0.5 animate-pulse"
+                                  >
+                                    {language === 'es' ? 'Ver Transmisión de Firma' : 'View Signature Registry'} →
+                                  </a>
+                                  {selectedVault.signatureIsSimulated !== false && (
+                                    <div className="text-[10px] text-amber-700 font-sans font-normal normal-case leading-normal max-w-lg mt-1 block">
+                                      {language === 'es' 
+                                        ? '⚠️ Firma Virtual de Demostración: Esta firma se generó de manera simulada localmente. No aparecerá en el explorador público Stellar.expert. Registre su clave privada en Configuración para notarizar firmas reales.'
+                                        : '⚠️ Simulated/Virtual Signature: This signature was generated as a local simulation. It will not appear on the public Stellar.expert explorer. Register your private key in Settings for real notarizations.'}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tab 2: Technical Sealing Metadata */}
+              {inspectorTab === 'technical' && (
+                <div className="space-y-4 pt-2 animate-fadeIn">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
+                    <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
+                      <span className="text-[9px] font-mono uppercase text-gray-400 block font-semibold">
+                        {language === 'es' ? 'DISPOSITIVO DE ENTROPÍA' : 'ENTROPY DEVICE'}
+                      </span>
+                      <p className="text-xs font-semibold text-gray-900 truncate">
+                        {selectedVault.manifest.quantumSource.provider}
+                      </p>
+                      <p className="text-[10px] font-mono text-gray-400 truncate">
+                        Target: {selectedVault.manifest.quantumSource.target}
+                      </p>
+                    </div>
+
+                    <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
+                      <span className="text-[9px] font-mono uppercase text-gray-400 block font-semibold">
+                        {language === 'es' ? 'ESTÁNDAR KEM SELECCIONADO' : 'SELECTED KEM STANDARD'}
+                      </span>
+                      <p className="text-xs font-semibold text-gray-900 truncate">
+                        {selectedVault.manifest.algorithm.kem}
+                      </p>
+                      <p className="text-[10px] text-gray-400 font-mono">
+                        {language === 'es' ? 'Parámetros: k=3, q=3329' : 'Parameters: k=3, q=3329'}
+                      </p>
+                    </div>
+
+                    <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
+                      <span className="text-[9px] font-mono uppercase text-gray-400 block font-semibold">
+                        {language === 'es' ? 'HASH DE INTEGRIDAD PRE/POST' : 'PRE/POST INTEGRITY HASH'}
+                      </span>
+                      <p className="text-xs font-mono font-semibold text-gray-900 truncate" title={selectedVault.manifest.payload.sha3Hash}>
+                        {selectedVault.manifest.payload.sha3Hash.slice(0, 16)}...
+                      </p>
+                      <p className="text-[10px] text-gray-400 font-mono uppercase">
+                        ALGORITMO: SHA3-256
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {selectedVault.notes && (
                 <div className="bg-gray-50 border border-l-2 border-l-black border-[#eaeaea] p-3.5 rounded-sm text-left">

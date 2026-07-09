@@ -14,23 +14,79 @@ import {
   Eye,
   Shield,
   Send,
-  EyeOff
+  EyeOff,
+  RefreshCw
 } from 'lucide-react';
 import { AppNotification } from '../types';
 
 export const NotificationsView: React.FC = () => {
-  const { notifications, vaults, markNotificationAsRead, language, addLog, resolveFilePayload, settings } = useApp();
+  const { 
+    notifications, 
+    vaults, 
+    markNotificationAsRead, 
+    signCustodyRecord, 
+    language, 
+    addLog, 
+    resolveFilePayload, 
+    settings, 
+    user 
+  } = useApp();
   const [selectedNotif, setSelectedNotif] = useState<AppNotification | null>(null);
   const [copied, setCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadingType, setDownloadingType] = useState<'armored' | 'viewq' | null>(null);
+  const [isSigning, setIsSigning] = useState(false);
+
+  const [decryptedPayload, setDecryptedPayload] = useState<string | null>(null);
+  const [isDecrypting, setIsDecrypting] = useState(false);
+  const [decryptError, setDecryptError] = useState<string | null>(null);
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
   const handleSelectNotification = (notif: AppNotification) => {
     setSelectedNotif(notif);
+    setDecryptedPayload(null);
+    setDecryptError(null);
     if (notif.status === 'unread') {
       markNotificationAsRead(notif.id);
+    }
+  };
+
+  const handleDecryptAndPreview = async () => {
+    if (!matchedVault) return;
+    setIsDecrypting(true);
+    setDecryptError(null);
+    addLog('SYSTEM', language === 'es' ? `Iniciando desencapsulado de claves poscuánticas para visualización en memoria...` : `Starting post-quantum key decapsulation for volatile preview...`);
+    try {
+      const { unsealPayload } = await import('../lib/pqc');
+      const decrypted = await unsealPayload(matchedVault.manifest);
+      setDecryptedPayload(decrypted);
+      addLog('SUCCESS', language === 'es' ? `¡Documento descifrado exitosamente en la memoria RAM!` : `Document decrypted successfully in RAM state!`);
+    } catch (err: any) {
+      setDecryptError(err.message || 'Error decrypting');
+      addLog('ERROR', `Error decrypting notification document: ${err.message || err}`);
+    } finally {
+      setIsDecrypting(false);
+    }
+  };
+
+  const handleSignReceipt = async () => {
+    if (!selectedNotif || !user?.profile) return;
+    setIsSigning(true);
+    try {
+      const txHash = await signCustodyRecord(selectedNotif.vaultId, user.profile);
+      setSelectedNotif(prev => prev ? {
+        ...prev,
+        signatureStatus: 'signed',
+        signerName: `${user.profile?.nombres} ${user.profile?.apellidos}`,
+        signatureTimestamp: new Date().toISOString(),
+        signatureStellarTxHash: txHash
+      } : null);
+    } catch (err) {
+      console.error(err);
+      alert(language === 'es' ? 'Fallo al firmar el acta' : 'Failed to sign the record');
+    } finally {
+      setIsSigning(false);
     }
   };
 
@@ -150,6 +206,25 @@ export const NotificationsView: React.FC = () => {
                     <h3 className="font-sans font-bold text-xs truncate max-w-full">
                       {notif.title}
                     </h3>
+
+                    {notif.requiresSignature && (
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {notif.signatureStatus === 'signed' ? (
+                          <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-sm ${
+                            isSelected ? 'bg-emerald-900 text-emerald-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                          }`}>
+                            {language === 'es' ? '✓ FIRMADO' : '✓ SIGNED'}
+                          </span>
+                        ) : (
+                          <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-sm flex items-center gap-1 animate-pulse ${
+                            isSelected ? 'bg-amber-800 text-amber-100' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-ping" />
+                            {language === 'es' ? '⚠️ FIRMA REQUERIDA' : '⚠️ SIGNATURE REQUIRED'}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {notif.notes && (
                       <p className={`text-[11px] line-clamp-1 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>
@@ -288,6 +363,255 @@ export const NotificationsView: React.FC = () => {
                             <span className="font-bold text-gray-900 block truncate">{selectedNotif.senderProfile.email}</span>
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Visualizer Trigger Block */}
+                    {matchedVault && (
+                      <div className="p-3 bg-indigo-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-gray-100">
+                        <div className="text-left">
+                          <span className="text-[9px] font-mono text-indigo-700 uppercase font-bold block">
+                            {language === 'es' ? 'VISTA PREVIA DE SEGURIDAD' : 'SECURITY PREVIEW'}
+                          </span>
+                          <span className="text-[10px] text-indigo-900/75 block leading-snug">
+                            {language === 'es' 
+                              ? 'Descifre el documento de forma temporal para revisarlo antes de firmar.' 
+                              : 'Decrypt the document temporarily to review it before signing.'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={decryptedPayload ? () => setDecryptedPayload(null) : handleDecryptAndPreview}
+                          disabled={isDecrypting}
+                          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-sm text-[10px] font-sans font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                            decryptedPayload 
+                              ? 'bg-red-600 hover:bg-red-700 text-white' 
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white animate-pulse'
+                          }`}
+                        >
+                          {isDecrypting ? (
+                            <>
+                              <RefreshCw size={11} className="animate-spin" />
+                              <span>{language === 'es' ? 'Descifrando...' : 'Decrypting...'}</span>
+                            </>
+                          ) : decryptedPayload ? (
+                            <>
+                              <EyeOff size={11} />
+                              <span>{language === 'es' ? 'Cerrar Vista Previa' : 'Close Preview'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye size={11} />
+                              <span>{language === 'es' ? 'Ver Documento' : 'View Document'}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Embedded Zero-Trace Secure Viewer */}
+                    {decryptedPayload && (
+                      <div className="p-4 bg-slate-950 text-slate-100 space-y-3 border-t border-slate-800 text-left">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider font-bold">
+                              {language === 'es' ? 'VISOR VOLÁTIL EN MEMORIA (FRICTIONLESS)' : 'VOLATILE MEMORY VIEWER (FRICTIONLESS)'}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setDecryptedPayload(null)}
+                            className="text-[9px] font-mono text-red-400 hover:text-red-300 uppercase tracking-widest font-bold"
+                          >
+                            {language === 'es' ? '[Purgar RAM]' : '[Purge RAM]'}
+                          </button>
+                        </div>
+                        
+                        <div className="p-1 bg-slate-900 border border-slate-800 rounded-sm overflow-hidden min-h-[300px] flex flex-col justify-between">
+                          {decryptedPayload.includes('application/pdf') ? (
+                            <div className="flex flex-col items-center justify-center p-2 bg-slate-950/80 rounded-sm space-y-3 w-full">
+                              <object
+                                data={decryptedPayload}
+                                type="application/pdf"
+                                className="w-full h-[400px] bg-slate-800 rounded-sm border border-slate-700"
+                              >
+                                <iframe
+                                  src={decryptedPayload}
+                                  className="w-full h-[400px] bg-slate-800 rounded-sm border border-slate-700"
+                                  title="Zero-Trace Document View"
+                                />
+                              </object>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    const newWindow = window.open();
+                                    if (newWindow) {
+                                      newWindow.document.write(
+                                        `<iframe src="${decryptedPayload}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
+                                      );
+                                    } else {
+                                      alert(language === 'es' ? 'La ventana emergente fue bloqueada por su navegador.' : 'Popup was blocked by your browser.');
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-[10px] font-sans font-bold transition-all cursor-pointer"
+                                >
+                                  {language === 'es' ? 'Abrir PDF en pantalla completa' : 'Open PDF in full screen'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = decryptedPayload;
+                                    link.download = selectedNotif.originalFilename || 'evidencia_descifrada.pdf';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                  }}
+                                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-sm text-[10px] font-sans font-bold transition-all cursor-pointer"
+                                >
+                                  {language === 'es' ? 'Descargar PDF' : 'Download PDF'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : decryptedPayload.startsWith('data:image/') ? (
+                            <div className="flex items-center justify-center p-4 bg-slate-950/80 rounded-sm">
+                              <img
+                                src={decryptedPayload}
+                                alt="Decrypted Evidence"
+                                className="max-w-full max-h-[350px] object-contain border border-slate-800 rounded-sm shadow-xl"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          ) : (
+                            (() => {
+                              let text = '';
+                              if (decryptedPayload.startsWith('data:')) {
+                                try {
+                                  const parts = decryptedPayload.split(',');
+                                  const base64Str = parts[1];
+                                  text = atob(base64Str);
+                                } catch (e) {
+                                  text = decryptedPayload;
+                                }
+                              } else {
+                                text = decryptedPayload;
+                              }
+                              
+                              return (
+                                <div className="bg-slate-950 p-4 rounded-sm border border-slate-900 font-mono text-xs text-slate-300 overflow-auto max-h-[300px] leading-relaxed whitespace-pre-wrap select-text">
+                                  {text}
+                                </div>
+                              );
+                            })()
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Requires Digital Signature Row */}
+                    {selectedNotif.requiresSignature && (
+                      <div className="p-4 bg-slate-50 border-t border-slate-100 space-y-3" id="notification-signature-box">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block">
+                          {language === 'es' ? 'FIRMA DIGITAL DE RECIBO DE CUSTODIA' : 'DIGITAL RECEIPT SIGNATURE OF CUSTODY'}
+                        </span>
+                        
+                        {selectedNotif.signatureStatus === 'signed' ? (
+                          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-sm space-y-2 text-emerald-950">
+                            <div className="flex items-center gap-2">
+                              <Check size={14} className="text-emerald-700 bg-emerald-100 p-0.5 rounded-full" />
+                              <span className="text-xs font-bold uppercase tracking-wide">
+                                {language === 'es' ? 'FIRMADO Y NOTARIZADO CON ÉXITO' : 'SUCCESSFULLY SIGNED & NOTARIZED'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-sans">
+                              <div>
+                                <span className="text-emerald-600/75 block text-[9px] uppercase font-mono">{language === 'es' ? 'Firmante' : 'Signer'}</span>
+                                <span className="font-bold block">{selectedNotif.signerName}</span>
+                              </div>
+                              <div>
+                                <span className="text-emerald-600/75 block text-[9px] uppercase font-mono">{language === 'es' ? 'Fecha y Hora' : 'Date & Time'}</span>
+                                <span className="font-bold block">
+                                  {selectedNotif.signatureTimestamp ? new Date(selectedNotif.signatureTimestamp).toLocaleString() : ''}
+                                </span>
+                              </div>
+                            </div>
+                            {selectedNotif.signatureStellarTxHash && (
+                              <div className="pt-2 border-t border-emerald-100 space-y-1">
+                                <span className="text-[9px] font-mono text-emerald-600/75 uppercase font-bold block">
+                                  {language === 'es' ? 'Hash de Notarización de Firma (Stellar)' : 'Signature Notarization Hash (Stellar)'}
+                                </span>
+                                <div className="flex items-center justify-between gap-3 text-[10px] font-mono bg-white border border-[#eaeaea] px-2 py-1.5 rounded-sm">
+                                  <span className="text-emerald-900 truncate select-all">
+                                    {selectedNotif.signatureStellarTxHash}
+                                  </span>
+                                  <a
+                                    href={`https://stellar.expert/explorer/${settings.stellarNetwork === 'public' ? 'public' : 'testnet'}/tx/${selectedNotif.signatureStellarTxHash}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-emerald-700 hover:text-emerald-950 p-0.5 transition-colors animate-pulse"
+                                    title={language === 'es' ? 'Ver en Stellar.expert' : 'View on Stellar.expert'}
+                                    id="stellar-sign-tx-link"
+                                  >
+                                    <ExternalLink size={12} />
+                                  </a>
+                                </div>
+                                {selectedNotif.signatureIsSimulated !== false && (
+                                  <div className="text-[10px] text-amber-700 bg-amber-50/50 p-1.5 rounded-sm border border-amber-100/30 font-sans leading-normal">
+                                    {language === 'es' 
+                                      ? '⚠️ Firma Virtual de Demostración: Esta transacción se generó localmente de manera simulada porque no hay llaves de Stellar reales configuradas. No figurará en el explorador público. Configure su "STELLAR_SOURCE_SECRET" en la pestaña de Configuración para notarizaciones reales.'
+                                      : '⚠️ Simulated/Virtual Signature: This transaction was generated locally because no real Stellar keys are configured in Settings. It will not appear on the public blockchain explorer. Configure "STELLAR_SOURCE_SECRET" in the Settings tab for live notarizations.'}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-amber-50 border border-amber-200 p-4 rounded-sm space-y-3">
+                            <div className="flex items-start gap-2.5">
+                              <AlertCircle size={15} className="text-amber-700 flex-shrink-0 mt-0.5" />
+                              <div className="space-y-0.5">
+                                <h5 className="text-xs font-bold text-amber-900 uppercase">
+                                  {language === 'es' ? 'Se requiere su firma digital' : 'Your digital signature is required'}
+                                </h5>
+                                <p className="text-[11px] text-amber-800 leading-normal">
+                                  {language === 'es'
+                                    ? 'El emisor ha solicitado su firma obligatoria de conformidad para este acta de custodia. Al firmar, se generará un recibo inmutable con su identidad poscuántica que se registrará de forma permanente en la red Stellar.'
+                                    : 'The sender has requested your mandatory signature of receipt for this custody record. Signing will generate an immutable receipt with your post-quantum identity, registered permanently on Stellar.'}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {user?.profile ? (
+                              <button
+                                onClick={handleSignReceipt}
+                                disabled={isSigning}
+                                className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-sans text-xs font-black uppercase tracking-wider px-4 py-2.5 rounded-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                id="sign-receipt-btn"
+                              >
+                                {isSigning ? (
+                                  <>
+                                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>{language === 'es' ? 'PROCESANDO FIRMA EN STELLAR LEDGER...' : 'PROCESSING SIGNATURE ON STELLAR LEDGER...'}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check size={14} />
+                                    <span>{language === 'es' ? 'Firmar y Notarizar Recibo de Custodia' : 'Sign & Notarize Custody Receipt'}</span>
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <div className="bg-red-50 border border-red-200 text-red-900 rounded-sm p-3 text-xs leading-normal">
+                                <p className="font-bold">
+                                  {language === 'es' ? 'Perfil incompleto' : 'Incomplete profile'}
+                                </p>
+                                <p className="text-red-800 mt-0.5">
+                                  {language === 'es' 
+                                    ? 'Para firmar este acta, primero debe configurar su identidad digital y pericial en la sección de "Perfil Pericial" en la configuración de la barra lateral.' 
+                                    : 'To sign this record, you must first complete your digital and forensic identity under the "Forensic Profile" section in Sidebar settings.'}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 

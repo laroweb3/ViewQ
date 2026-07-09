@@ -205,6 +205,43 @@ export const WikiView: React.FC = () => {
       )
     },
     {
+      id: 'viewq-vs-webq-extension',
+      category: 'sealing',
+      icon: FileCheck2,
+      questionEs: '¿Cuál es la diferencia entre las extensiones de archivo .viewq y .webq?',
+      questionEn: 'What is the difference between .viewq and .webq file extensions?',
+      answerEs: (
+        <div className="space-y-3 leading-relaxed text-gray-600 text-xs md:text-sm">
+          <p>
+            Ambas extensiones pertenecen al ecosistema de preservación criptográfica poscuántica de la plataforma, pero cumplen roles complementarios:
+          </p>
+          <ul className="list-disc pl-5 space-y-2">
+            <li>
+              <strong className="text-gray-900">Extensión <code>.viewq</code> (Sealed Container):</strong> Es el archivo contenedor que guarda la evidencia original completamente cifrada con AES-256-GCM y contiene los metadatos del anclaje poscuántico ML-KEM-768. Es ideal para el almacenamiento de larga duración, traslado judicial y auditoría de inmutabilidad en Stellar.
+            </li>
+            <li>
+              <strong className="text-gray-900">Extensión <code>.webq</code> (Web-Quantum Credential):</strong> Es un formato de firma electrónica e intercambio liviano optimizado para navegadores web estándar. Permite autorizar, verificar firmas y decapsular claves simétricas en caliente a través de micro-librerías en JS sin necesidad de hardware o clientes de escritorio pesados, facilitando el acceso inmediato y seguro desde terminales forenses remotos.
+            </li>
+          </ul>
+        </div>
+      ),
+      answerEn: (
+        <div className="space-y-3 leading-relaxed text-gray-600 text-xs md:text-sm">
+          <p>
+            Both extensions belong to the platform's post-quantum cryptographic ecosystem, serving complementary roles:
+          </p>
+          <ul className="list-disc pl-5 space-y-2">
+            <li>
+              <strong className="text-gray-900"><code>.viewq</code> Extension (Sealed Container):</strong> The core container file storing the evidence fully encrypted via AES-256-GCM along with ML-KEM-768 post-quantum metadata. It is built for long-term storage, judicial transport, and immutability auditing on Stellar.
+            </li>
+            <li>
+              <strong className="text-gray-900"><code>.webq</code> Extension (Web-Quantum Credential):</strong> A lightweight electronic signature and exchange format optimized for standard web browsers. It enables on-the-fly verification and symmetric key decapsulation using pure JS micro-libraries without requiring specialized hardware or heavy desktop clients, facilitating secure instant access from remote forensic endpoints.
+            </li>
+          </ul>
+        </div>
+      )
+    },
+    {
       id: 'ephemeral-sharing-security',
       category: 'sharing',
       icon: EyeOff,
@@ -220,7 +257,7 @@ export const WikiView: React.FC = () => {
               <strong className="text-gray-900">Criptografía Efímera:</strong> Al compartir, el contenido se vuelve a cifrar con un token QRNG único. La clave de descifrado viaja de forma segura únicamente en el fragmento hash de la URL (por ejemplo, <code>#key=...</code>), lo que significa que el servidor o intermediarios de red nunca tienen acceso a la clave, ya que los navegadores no envían el fragmento hash al servidor.
             </li>
             <li>
-              <strong className="text-gray-900">Autodestrucción Garantizada:</strong> El receptor simula o abre el enlace. En ese milisegundo exacto, el servidor marca el token como consumido en la base de datos de Stellar o local y borra definitivamente el criptograma del repositorio. No hay segundas lecturas.
+              <strong className="text-gray-900">Autodestrucción Garantizada:</strong> El receptor accede o abre el enlace. En ese milisegundo exacto, el servidor marca el token como consumido en la base de datos de Stellar o local y borra definitivamente el criptograma del repositorio. No hay segundas lecturas.
             </li>
             <li>
               <strong className="text-gray-900">Auditoría Forense Silenciosa:</strong> Mientras el archivo se descifra en el navegador del receptor, viewQ captura de forma automatizada los metadatos de acceso (Dirección IP, agente de usuario del dispositivo, sistema operativo, resolución de pantalla y geolocalización aproximada). Estos datos se empaquetan en una huella digital que queda notarizada de manera permanente e inalterable en Stellar. Si un enlace fue consumido, el creador puede verificar exactamente cuándo y quién lo abrió primero.
@@ -251,8 +288,8 @@ export const WikiView: React.FC = () => {
       id: 'system-scopes-and-limits',
       category: 'limits',
       icon: ShieldAlert,
-      questionEs: '¿Cuáles son los alcances, limitaciones y el modo simulado de la plataforma?',
-      questionEn: 'What are the scope, limitations, and simulated mode of the platform?',
+      questionEs: '¿Cuáles son los alcances, limitaciones y el modo de operación virtual de la plataforma?',
+      questionEn: 'What are the scope, limitations, and virtual equivalent mode of the platform?',
       answerEs: (
         <div className="space-y-3 leading-relaxed text-gray-600 text-xs md:text-sm">
           <p>
@@ -267,9 +304,9 @@ export const WikiView: React.FC = () => {
             </div>
             
             <div className="flex gap-2">
-              <span className="text-xs bg-[#f59e0b]/10 text-[#f59e0b] px-2 py-0.5 rounded-sm font-mono font-bold h-fit flex-shrink-0">MODO SIMULADOR</span>
+              <span className="text-xs bg-[#f59e0b]/10 text-[#f59e0b] px-2 py-0.5 rounded-sm font-mono font-bold h-fit flex-shrink-0">PROCESAMIENTO VIRTUAL</span>
               <p className="text-xs text-gray-600">
-                Si no cuentas con credenciales pagadas de la API de IonQ o saldo de lumens de Stellar, la plataforma opera por defecto en <strong>Modo Simulador de QPU y Testnet de Stellar</strong>. El simulador reproduce matemáticamente el ruido y las matrices de superposición cuántica para fines didácticos y de auditoría interna, mientras que la red de prueba de Stellar simula el anclaje real sin incurrir en costos reales de transacción.
+                Si no cuentas con credenciales pagadas de la API de IonQ o saldo de lumens de Stellar, la plataforma opera por defecto en <strong>Modo de Coprocesador Virtual QPU y Testnet de Stellar</strong>. El motor virtual reproduce matemáticamente las matrices de superposición cuántica para fines didácticos y de auditoría interna, mientras que la red de prueba de Stellar consolida el anclaje real sin incurrir en costos de producción.
               </p>
             </div>
 
@@ -296,9 +333,9 @@ export const WikiView: React.FC = () => {
             </div>
             
             <div className="flex gap-2">
-              <span className="text-xs bg-[#f59e0b]/10 text-[#f59e0b] px-2 py-0.5 rounded-sm font-mono font-bold h-fit flex-shrink-0">SIMULATION MODE</span>
+              <span className="text-xs bg-[#f59e0b]/10 text-[#f59e0b] px-2 py-0.5 rounded-sm font-mono font-bold h-fit flex-shrink-0">VIRTUAL COPROCESSOR</span>
               <p className="text-xs text-gray-600">
-                If no paid IonQ API key or funded Stellar secret is supplied, the application defaults to a highly-robust <strong>QPU Simulator and Stellar Testnet integration</strong>. The software simulator models qubit superposition matrices for compliance testing, and the testnet handles block anchorings for free.
+                If no paid IonQ API key or funded Stellar secret is supplied, the application defaults to a highly-robust <strong>QPU Virtual Coprocessor and Stellar Testnet integration</strong>. The virtual engine models qubit superposition matrices for compliance testing, and the testnet handles block anchorings for free.
               </p>
             </div>
 
