@@ -35,6 +35,20 @@ export const SettingsView: React.FC = () => {
 
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Keep local state in sync when settings are loaded or updated from context/Firestore
+  useEffect(() => {
+    if (settings) {
+      setToken(settings.ionqApiToken || '');
+      setTarget(settings.target || 'ionq.simulator');
+      setProxyUrl(settings.apiProxyBaseUrl || 'https://api.ionq.co/v0.3');
+      setStellarSecret(settings.stellarSourceSecret || '');
+      setStellarNetwork(settings.stellarNetwork || 'testnet');
+      setPinataJwt(settings.pinataJwt || '');
+      setPinataGateway(settings.pinataGateway || 'gateway.pinata.cloud');
+      setUsePinata(!!settings.usePinata);
+    }
+  }, [settings]);
+
   // Derive public key and fetch real Stellar balance
   useEffect(() => {
     let active = true;

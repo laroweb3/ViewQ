@@ -498,12 +498,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsubscribe();
   }, [user?.username]);
 
-  // 6. Listen to global settings (saved by superadmin laro) in firestore
+  // 6. Listen to global settings and user-specific settings in firestore
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'laro'), (docSnap) => {
+    const username = user?.username?.toLowerCase();
+
+    // Listen to global settings (laro)
+    const unsubscribeGlobal = onSnapshot(doc(db, 'settings', 'laro'), (docSnap) => {
       if (docSnap.exists()) {
         const cloudSettings = docSnap.data() as AppSettings;
         setSettings(prev => {
+          // If we are logged in as a non-laro user, we only take laro's global settings as defaults
+          // for fields that are empty or not configured. Otherwise, we do not let it overwrite.
+          if (username && username !== 'laro') {
+            return prev;
+          }
+
           const mergedSettings = {
             ...prev,
             ...cloudSettings,
@@ -519,8 +528,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'settings/laro');
     });
-    return () => unsubscribe();
-  }, []);
+
+    let unsubscribeUser: (() => void) | undefined = undefined;
+
+    // If logged in as a non-laro user, also listen to their specific settings
+    if (username && username !== 'laro') {
+      unsubscribeUser = onSnapshot(doc(db, 'settings', username), (docSnap) => {
+        if (docSnap.exists()) {
+          const userCloudSettings = docSnap.data() as AppSettings;
+          setSettings(prev => {
+            const mergedSettings = {
+              ...prev,
+              ...userCloudSettings,
+            };
+            localStorage.setItem('quantum_pqc_settings', JSON.stringify(mergedSettings));
+            return mergedSettings;
+          });
+        }
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, `settings/${username}`);
+      });
+    }
+
+    return () => {
+      unsubscribeGlobal();
+      if (unsubscribeUser) unsubscribeUser();
+    };
+  }, [user?.username]);
 
   // Keep user session in localStorage so they stay logged in on refresh
   useEffect(() => {
