@@ -74,14 +74,17 @@ export const ApprovalStatusScreen: React.FC = () => {
   const isRejected = user?.status === 'rejected';
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" id="approval-status-container">
-      <div className="max-w-md w-full bg-white border border-[#eaeaea] rounded-sm p-8 shadow-xs relative text-center">
+    <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 py-10 relative overflow-hidden" id="approval-status-container">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_26%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.06),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.7),rgba(238,242,247,1))]" />
+      <div className="pointer-events-none absolute inset-0 opacity-45 bg-[linear-gradient(rgba(255,255,255,0.34)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.28)_1px,transparent_1px)] bg-[size:64px_64px]" />
+
+      <div className="relative max-w-xl w-full glass-surface rounded-[32px] p-8 sm:p-10 text-center">
         
         {/* Language selector */}
         <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
           <button
             onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
-            className="px-2 py-1 text-[9px] font-sans font-bold border border-[#eaeaea] rounded-sm bg-white hover:border-black cursor-pointer transition-colors"
+            className="glass-button-secondary px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em]"
           >
             {language === 'es' ? 'EN' : 'ES'}
           </button>
@@ -92,12 +95,12 @@ export const ApprovalStatusScreen: React.FC = () => {
           <Logo size={48} className="mx-auto mb-3" />
           
           {isRejected ? (
-            <div className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-100 px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-wider">
+            <div className="glass-badge px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-red-700 border-red-100 bg-red-50/85">
               <ShieldAlert size={10} />
               {t.rejectedBadge.toUpperCase()}
             </div>
           ) : (
-            <div className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-wider animate-pulse">
+            <div className="glass-badge px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-amber-700 border-amber-100 bg-amber-50/85 animate-pulse">
               <Clock size={10} />
               {t.pendingBadge.toUpperCase()}
             </div>
@@ -107,20 +110,20 @@ export const ApprovalStatusScreen: React.FC = () => {
             {t.identifier} <strong className="text-black uppercase">{user?.username}</strong>
           </p>
 
-          <h2 className="font-sans font-bold text-lg text-gray-900 tracking-tight mt-3">
+          <h2 className="font-display font-semibold text-2xl text-slate-950 tracking-tight mt-3">
             {isRejected ? t.rejectedTitle : t.pendingTitle}
           </h2>
-          <p className="text-xs text-gray-500 font-sans leading-relaxed max-w-sm mx-auto">
+          <p className="text-sm text-slate-600 font-sans leading-relaxed max-w-sm mx-auto">
             {isRejected ? t.rejectedSub : t.pendingSub}
           </p>
         </div>
 
         {/* Informative Help Box */}
-        <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-4 text-left space-y-2.5 mb-6 text-xs">
-          <span className="text-[9px] font-mono text-gray-400 block uppercase font-bold tracking-wider">
+        <div className="glass-surface-soft rounded-[24px] p-4 text-left space-y-2.5 mb-6 text-xs">
+          <span className="text-[9px] font-mono text-slate-500 block uppercase font-bold tracking-wider">
             {t.securityStatus}
           </span>
-          <p className="text-gray-600 leading-relaxed font-sans">
+          <p className="text-slate-600 leading-relaxed font-sans">
             {isRejected 
               ? (language === 'es' 
                   ? 'Su clave post-cuántica y perfil forense han sido bloqueados. Por favor, póngase en contacto con el Administrador para resolver discrepancias de credenciales.'
@@ -130,9 +133,9 @@ export const ApprovalStatusScreen: React.FC = () => {
                   : 'Only the Superadministrator can grant official quantum injection permissions in the user control panel.')
             }
           </p>
-          <div className="text-[10px] font-mono text-gray-400 flex items-center justify-between pt-1.5 border-t border-gray-200/60">
+          <div className="text-[10px] font-mono text-slate-500 flex items-center justify-between pt-1.5 border-t border-white/70">
             <span>{language === 'es' ? 'Rol Requerido:' : 'Required Role:'}</span>
-            <span className="text-black font-semibold uppercase">Superadmin</span>
+            <span className="text-slate-950 font-semibold uppercase">Superadmin</span>
           </div>
         </div>
 
@@ -142,16 +145,16 @@ export const ApprovalStatusScreen: React.FC = () => {
             <button
               onClick={handleCheckStatus}
               disabled={isChecking}
-              className="w-full py-2.5 bg-black hover:bg-zinc-800 text-white text-xs font-sans font-bold uppercase tracking-wider rounded-sm cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1.5"
+              className="glass-button-primary w-full py-3 text-xs font-semibold uppercase tracking-[0.22em] disabled:opacity-50"
             >
               <RefreshCw size={12} className={isChecking ? 'animate-spin' : ''} />
               {isChecking ? t.checking : t.checkBtn}
             </button>
 
             {logs.length > 0 && (
-              <div className="bg-[#fafafa] border border-[#eaeaea] rounded-sm p-3 h-24 overflow-y-auto font-mono text-[9px] text-left text-gray-600 space-y-1">
+              <div className="glass-surface-soft rounded-[22px] p-3 h-24 overflow-y-auto font-mono text-[9px] text-left text-slate-600 space-y-1 hide-scrollbar">
                 {logs.map((log, i) => (
-                  <div key={i} className="leading-relaxed border-l border-gray-200 pl-1.5">
+                  <div key={i} className="leading-relaxed border-l border-white/70 pl-1.5">
                     {log}
                   </div>
                 ))}
@@ -161,10 +164,10 @@ export const ApprovalStatusScreen: React.FC = () => {
         )}
 
         {/* Logout action */}
-        <div className="pt-4 border-t border-[#eaeaea]">
+        <div className="pt-4 border-t border-white/70">
           <button
             onClick={logout}
-            className="w-full py-2.5 border border-red-200 text-red-600 hover:bg-red-50 text-xs font-sans font-bold uppercase tracking-wider rounded-sm cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+            className="glass-button-secondary w-full py-3 text-xs font-semibold uppercase tracking-[0.22em] text-red-600 border-red-200 bg-red-50/70 hover:bg-red-50"
           >
             <LogOut size={12} />
             {t.logoutBtn}
@@ -172,8 +175,8 @@ export const ApprovalStatusScreen: React.FC = () => {
         </div>
 
         {/* Footprint Powered By VibeDesk */}
-        <div className="mt-8 pt-4 border-t border-[#eaeaea]/50">
-          <span className="text-[9px] font-sans font-semibold tracking-widest text-gray-400 uppercase">
+        <div className="mt-8 pt-4 border-t border-white/60">
+          <span className="text-[9px] font-sans font-semibold tracking-widest text-slate-500 uppercase">
             POWERED BY VIBEDESK
           </span>
         </div>

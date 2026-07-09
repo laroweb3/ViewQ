@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { useApp } from '../context/AppContext';
 import { Terminal, Trash2, ShieldCheck, RefreshCw } from 'lucide-react';
+import { ProcessEventFeed } from './ProcessEventFeed';
 
 interface ConsoleProps {
   isRunning: boolean;
@@ -8,29 +9,25 @@ interface ConsoleProps {
 
 export const Console: React.FC<ConsoleProps> = ({ isRunning }) => {
   const { logs, clearLogs, language } = useApp();
-  const consoleEndRef = useRef<HTMLDivElement>(null);
+  const feedItems = logs.slice(-8).map((log, index) => {
+    const tone = log.level === 'SUCCESS'
+      ? { color: '#dcfce7', glyph: '✅' }
+      : log.level === 'WARN'
+        ? { color: '#fef3c7', glyph: '⚠️' }
+        : log.level === 'ERROR'
+          ? { color: '#fee2e2', glyph: '⛔' }
+          : { color: '#dbeafe', glyph: '🛰️' };
 
-  // Auto scroll to bottom of the console on new logs
-  useEffect(() => {
-    if (consoleEndRef.current) {
-      consoleEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs]);
-
-  const getLogColorClass = (level: string) => {
-    switch (level) {
-      case 'SUCCESS':
-        return 'text-[#10b981] font-semibold'; // Emerald green
-      case 'WARN':
-        return 'text-[#f59e0b]'; // Amber orange
-      case 'ERROR':
-        return 'text-[#ef4444] font-bold animate-pulse'; // Bright red
-      case 'SYSTEM':
-        return 'text-[#38bdf8] font-bold tracking-wide'; // Sky blue
-      default:
-        return 'text-[#a1a1aa]'; // Zinc gray
-    }
-  };
+    return {
+      id: `${log.id}-${index}`,
+      title: log.level,
+      description: log.message,
+      stage: log.timestamp,
+      color: tone.color,
+      status: log.level === 'ERROR' ? 'running' as const : log.level === 'SUCCESS' ? 'success' as const : isRunning && index === logs.slice(-8).length - 1 ? 'running' as const : 'success' as const,
+      glyph: tone.glyph,
+    };
+  });
 
   return (
     <div id="quantum-console-container" className="flex flex-col bg-[#18181b] border border-[#27272a] rounded-sm overflow-hidden h-full min-h-[420px] md:min-h-[480px]">
@@ -76,7 +73,7 @@ export const Console: React.FC<ConsoleProps> = ({ isRunning }) => {
       </div>
 
       {/* Console Display Screen */}
-      <div className="flex-1 p-5 overflow-y-auto font-mono text-xs leading-relaxed space-y-2 selection:bg-white/10 scrollbar-thin">
+      <div className="flex-1 p-5 overflow-y-auto hide-scrollbar font-mono text-xs leading-relaxed space-y-2 selection:bg-white/10">
         {logs.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center text-[#52525b] select-none py-12">
             <Terminal size={32} className="opacity-40 mb-3" />
@@ -90,18 +87,7 @@ export const Console: React.FC<ConsoleProps> = ({ isRunning }) => {
             </p>
           </div>
         ) : (
-          <>
-            {logs.map((log) => (
-              <div key={log.id} className="flex items-start gap-2 border-b border-[#27272a]/10 pb-1">
-                <span className="text-gray-600 select-none flex-shrink-0">[{log.timestamp}]</span>
-                <span className="font-bold flex-shrink-0 select-none min-w-[55px]">
-                  <span className={getLogColorClass(log.level)}>{log.level}</span>:
-                </span>
-                <span className={`break-all ${getLogColorClass(log.level)}`}>{log.message}</span>
-              </div>
-            ))}
-            <div ref={consoleEndRef} />
-          </>
+          <ProcessEventFeed items={feedItems} variant="dark" className="h-full min-h-[320px]" />
         )}
       </div>
 

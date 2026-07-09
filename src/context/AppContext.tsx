@@ -87,8 +87,8 @@ interface AppContextType {
   clearLogs: () => void;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
-  activeTab: 'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify' | 'wiki' | 'users' | 'notifications';
-  setActiveTab: (tab: 'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify' | 'wiki' | 'users' | 'notifications') => void;
+  activeTab: 'start' | 'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify' | 'wiki' | 'users' | 'notifications';
+  setActiveTab: (tab: 'start' | 'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify' | 'wiki' | 'users' | 'notifications') => void;
   
   // User Authentication State
   user: { username: string; authType: 'passkey' | 'diceware'; status: 'pending' | 'approved' | 'rejected'; profile?: UserProfile } | null;
@@ -134,6 +134,22 @@ const DEFAULT_SETTINGS: AppSettings = {
   pinataJwt: '',
   pinataGateway: 'gateway.pinata.cloud',
   usePinata: false,
+};
+
+const LOCAL_VAULT_INLINE_LIMIT = 120000;
+
+const slimVaultForStorage = (vault: VaultRecord): VaultRecord => {
+  const slimVault = { ...vault };
+
+  if (slimVault.armoredFileBase64 && !slimVault.armoredFileBase64.startsWith('chunked:') && slimVault.armoredFileBase64.length > LOCAL_VAULT_INLINE_LIMIT) {
+    slimVault.armoredFileBase64 = `local_only:${slimVault.id}`;
+  }
+
+  if (slimVault.viewQFileBase64 && !slimVault.viewQFileBase64.startsWith('chunked:') && slimVault.viewQFileBase64.length > LOCAL_VAULT_INLINE_LIMIT) {
+    slimVault.viewQFileBase64 = `local_only:${slimVault.id}`;
+  }
+
+  return slimVault;
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -237,7 +253,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return [];
   });
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify' | 'wiki' | 'users' | 'notifications'>('transmission');
+  const [activeTab, setActiveTab] = useState<'start' | 'transmission' | 'settings' | 'history' | 'telemetry' | 'shares' | 'verify' | 'wiki' | 'users' | 'notifications'>('start');
   const [firestoreStatus, setFirestoreStatus] = useState<'online' | 'offline' | 'quota-exceeded'>('online');
 
   // Register the global Firestore error callback to map database failures to user-friendly states
@@ -268,7 +284,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Automatically save state changes to localStorage as a robust local-first backup
   useEffect(() => {
-    localStorage.setItem('quantum_pqc_vaults', JSON.stringify(vaults));
+    try {
+      const safeVaults = vaults.map(slimVaultForStorage);
+      localStorage.setItem('quantum_pqc_vaults', JSON.stringify(safeVaults));
+    } catch (err) {
+      console.warn('Failed to persist vault list to localStorage:', err);
+    }
   }, [vaults]);
 
   useEffect(() => {
@@ -482,8 +503,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribe = onSnapshot(doc(db, 'settings', 'laro'), (docSnap) => {
       if (docSnap.exists()) {
         const cloudSettings = docSnap.data() as AppSettings;
-        setSettings(cloudSettings);
-        localStorage.setItem('quantum_pqc_settings', JSON.stringify(cloudSettings));
+        setSettings(prev => {
+          const mergedSettings = {
+            ...prev,
+            ...cloudSettings,
+            stellarSourceSecret: cloudSettings.stellarSourceSecret?.trim()
+              ? cloudSettings.stellarSourceSecret
+              : prev.stellarSourceSecret,
+          };
+
+          localStorage.setItem('quantum_pqc_settings', JSON.stringify(mergedSettings));
+          return mergedSettings;
+        });
       }
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'settings/laro');

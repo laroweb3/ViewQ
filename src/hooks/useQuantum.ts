@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { sealPayload } from '../lib/pqc';
+import { sealPayload, decodeEncryptedPayload } from '../lib/pqc';
 import { SealingManifest, VaultRecord, StellarNotarization } from '../types';
 import { injectMetadata } from '../lib/metadataInjector';
 import { packViewQ } from '../lib/viewq';
@@ -25,21 +25,42 @@ const hexToUint8Array = (hex: string): Uint8Array => {
   return arr;
 };
 
+const bytesToDataUrl = (bytes: Uint8Array, mimeType: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    try {
+      const blob = new Blob([bytes], { type: mimeType });
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('No se pudo serializar el archivo blindado a Data URL.'));
+        }
+      };
+      reader.onerror = () => reject(reader.error || new Error('Fallo al convertir bytes a Data URL.'));
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
 export function useQuantum() {
   const { settings, addLog, clearLogs, addVault, user } = useApp();
   const [isRunning, setIsRunning] = useState(false);
   const [manifestResult, setManifestResult] = useState<SealingManifest | null>(null);
 
   const executePipeline = async (
-    message: string,
+    message: string | Uint8Array,
     title: string,
     filename?: string,
     notes?: string,
+    mimeType: string = 'text/plain',
     destinatario?: string,
     recipientUsername?: string,
     requiresSignature?: boolean
   ): Promise<SealingManifest | null> => {
-    if (!message) {
+    if ((typeof message === 'string' && !message) || (message instanceof Uint8Array && message.length === 0)) {
       addLog('ERROR', 'El mensaje o archivo a sellar no puede estar vacío.');
       return null;
     }
@@ -409,17 +430,11 @@ export function useQuantum() {
 
       let originalBytes: Uint8Array;
       const actualFilename = filename || 'documento_sellado.txt';
-      
-      if (message.startsWith('data:')) {
-        const parts = message.split(',');
-        const base64Str = parts[1];
-        const byteCharacters = atob(base64Str);
-        originalBytes = new Uint8Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          originalBytes[i] = byteCharacters.charCodeAt(i);
-        }
-      } else {
+
+      if (typeof message === 'string') {
         originalBytes = new TextEncoder().encode(message);
+      } else {
+        originalBytes = message;
       }
 
       const finalTxHash = stellarNotarizationObj?.txHash || sha3Hash;
@@ -434,20 +449,8 @@ export function useQuantum() {
           finalJobId,
           sha3Hash
         );
-
-        // Convert modified bytes back to Base64 data url for saving/downloading safely
-        let binaryString = '';
-        const len = modifiedBytes.byteLength;
-        for (let i = 0; i < len; i++) {
-          binaryString += String.fromCharCode(modifiedBytes[i]);
-        }
-        const modifiedBase64 = btoa(binaryString);
         
-        const mimeType = message.startsWith('data:') 
-          ? message.split(',')[0].split(';')[0].substring(5)
-          : 'text/plain';
-
-        armoredFileBase64 = `data:${mimeType};base64,${modifiedBase64}`;
+        armoredFileBase64 = await bytesToDataUrl(modifiedBytes, mimeType);
 
         addLog('SUCCESS', `¡Inyección finalizada! Formato de metadatos ocultos: [${format.toUpperCase()}]`);
         addLog('INFO', `Campos inyectados: Tx de Stellar y ID de QPU IonQ incrustados sin alterar contenido visual.`);
@@ -459,14 +462,7 @@ export function useQuantum() {
       let viewQFileBase64 = '';
       try {
         addLog('INFO', `Generando archivo encriptado .viewQ con extensión encapsulada...`);
-        // We get the encrypted payload as hex from the manifest
-        const encHex = manifest.payload.encryptedData;
-        
-        // Convert hex to bytes
-        const encBytes = new Uint8Array(encHex.length / 2);
-        for (let i = 0; i < encBytes.length; i++) {
-          encBytes[i] = parseInt(encHex.substring(i * 2, i * 2 + 2), 16);
-        }
+        const encBytes = decodeEncryptedPayload(manifest.payload.encryptedData);
         
         const fileExt = actualFilename.includes('.') 
           ? actualFilename.substring(actualFilename.lastIndexOf('.')) 
@@ -483,15 +479,7 @@ export function useQuantum() {
         };
         
         const viewQBytes = packViewQ(encBytes, viewQHeader);
-        
-        // Convert viewQ bytes to Base64 data URL
-        let binaryString = '';
-        const len = viewQBytes.byteLength;
-        for (let i = 0; i < len; i++) {
-          binaryString += String.fromCharCode(viewQBytes[i]);
-        }
-        const viewQBase64 = btoa(binaryString);
-        viewQFileBase64 = `data:application/octet-stream;base64,${viewQBase64}`;
+        viewQFileBase64 = await bytesToDataUrl(viewQBytes, 'application/octet-stream');
         
         addLog('SUCCESS', `¡Archivo .viewQ generado exitosamente! El contenido quedó completamente "deformado" bajo cifrado de grado militar.`);
       } catch (err: any) {

@@ -131,13 +131,14 @@ export const SettingsView: React.FC = () => {
   const isSimulatedQuantum = !token || token.trim().length === 0;
 
   return (
-    <div className="space-y-8 text-left animate-fade-in" id="settings-view-root">
+    <div className="space-y-8 text-left animate-fade-in relative overflow-hidden" id="settings-view-root">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_26%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.06),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.55),rgba(238,242,247,0.95))]" />
       {/* Header section */}
-      <div className="border-b border-[#eaeaea] pb-5">
-        <h1 className="font-sans font-semibold tracking-tight text-xl text-[#111111]" id="settings-title">
+      <div className="relative border-b border-white/70 pb-5">
+        <h1 className="font-display font-semibold tracking-tight text-3xl text-slate-950" id="settings-title">
           {t.settingsTitle}
         </h1>
-        <p className="text-[11px] text-gray-500 mt-1">
+        <p className="text-sm text-slate-600 mt-1">
           {t.settingsSub}
         </p>
       </div>
@@ -145,8 +146,8 @@ export const SettingsView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left column: Live Wallet Monitor Card */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white border border-[#eaeaea] p-5 rounded-sm h-fit space-y-4">
-            <h3 className="font-sans font-bold text-[10px] text-gray-900 uppercase tracking-widest flex items-center gap-2 border-b border-[#fafafa] pb-3">
+          <div className="glass-surface p-5 rounded-[28px] h-fit space-y-4">
+            <h3 className="font-sans font-bold text-[10px] text-slate-950 uppercase tracking-widest flex items-center gap-2 border-b border-white/70 pb-3">
               <Wallet size={14} className="text-black" />
               {t.walletMonitor}
             </h3>
@@ -221,12 +222,12 @@ export const SettingsView: React.FC = () => {
         </div>
 
         {/* Right column: Form */}
-        <div className="lg:col-span-2 bg-white border border-[#eaeaea] p-6 rounded-sm shadow-xs">
+          <div className="lg:col-span-2 glass-surface p-6 rounded-[28px]">
           <form onSubmit={handleSave} className="space-y-6">
             
             {/* PANEL 1: CONFIGURACION IONQ */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-[#fafafa]">
+              <div className="flex items-center gap-2 pb-2 border-b border-white/70">
                 <Cpu size={15} className="text-black" />
                 <h3 className="font-sans font-bold text-[10px] text-gray-900 uppercase tracking-widest">
                   {t.ionqSection}
@@ -259,8 +260,6 @@ export const SettingsView: React.FC = () => {
                   </button>
                 </div>
               </div>
-
-              {/* Target Dropdown */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono uppercase text-gray-400 font-bold">

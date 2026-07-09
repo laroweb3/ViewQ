@@ -159,20 +159,23 @@ export const ProfileWizard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" id="profile-wizard-container">
-      <div className="max-w-xl w-full bg-white border border-[#eaeaea] rounded-sm p-8 shadow-xs relative">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden" id="profile-wizard-container">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_26%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.06),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.7),rgba(238,242,247,1))]" />
+      <div className="pointer-events-none absolute inset-0 opacity-45 bg-[linear-gradient(rgba(255,255,255,0.34)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.28)_1px,transparent_1px)] bg-[size:64px_64px]" />
+
+      <div className="max-w-2xl w-full glass-surface rounded-[32px] p-8 sm:p-10 relative">
         
         {/* Language & LogOut buttons */}
         <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
           <button
             onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
-            className="px-2 py-1 text-[9px] font-sans font-bold border border-[#eaeaea] rounded-sm bg-white hover:border-black cursor-pointer transition-colors"
+            className="glass-button-secondary px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em]"
           >
             {language === 'es' ? 'EN' : 'ES'}
           </button>
           <button
             onClick={logout}
-            className="px-2 py-1 text-[9px] font-sans font-bold border border-red-200 text-red-600 rounded-sm bg-red-50/50 hover:bg-red-50 cursor-pointer transition-colors"
+            className="glass-button-secondary px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-red-600 border-red-200 bg-red-50/70 hover:bg-red-50"
           >
             {t.logoutBtn}
           </button>
@@ -181,31 +184,31 @@ export const ProfileWizard: React.FC = () => {
         {/* Header */}
         <div className="text-center space-y-2 mb-8">
           <Logo size={42} className="mx-auto mb-3" />
-          <div className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-wider">
+          <div className="glass-badge px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 border-emerald-100 bg-emerald-50/85">
             <Shield size={10} />
             {t.securityEnclave}
           </div>
           <p className="text-xs font-mono text-gray-400 mt-1">
             {t.welcomeUser}: <strong className="text-black">{user?.username}</strong>
           </p>
-          <h2 className="font-sans font-bold text-lg text-gray-900 tracking-tight mt-3">
+          <h2 className="font-display font-semibold text-2xl text-slate-950 tracking-tight mt-3">
             {t.wizardTitle}
           </h2>
-          <p className="text-xs text-gray-500 font-sans leading-relaxed max-w-sm mx-auto">
+          <p className="text-sm text-slate-600 font-sans leading-relaxed max-w-sm mx-auto">
             {t.wizardSub}
           </p>
         </div>
 
         {/* Step Indicator */}
-        <div className="mb-8 border-b border-[#eaeaea] pb-4">
+        <div className="mb-8 border-b border-white/70 pb-4">
           <div className="grid grid-cols-4 gap-2 text-center">
             {[1, 2, 3, 4].map((num) => (
               <div key={num} className="space-y-2">
                 <div className={`h-1 rounded-full transition-all ${
-                  currentStep >= num ? 'bg-black' : 'bg-gray-100'
+                  currentStep >= num ? 'bg-slate-950' : 'bg-white/80'
                 }`} />
                 <span className={`text-[9px] font-mono font-bold tracking-wider uppercase block truncate ${
-                  currentStep === num ? 'text-black' : 'text-gray-400'
+                  currentStep === num ? 'text-slate-950' : 'text-slate-500'
                 }`}>
                   {num === 1 && '01 ' + t.step1}
                   {num === 2 && '02 ' + t.step2}
@@ -223,8 +226,8 @@ export const ProfileWizard: React.FC = () => {
             <div className="space-y-4 text-left animate-fade-in">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
-                    <User size={12} className="text-gray-400" />
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                <User size={12} className="text-slate-400" />
                     {t.nombres}
                   </label>
                   <input
@@ -232,7 +235,7 @@ export const ProfileWizard: React.FC = () => {
                     required
                     value={formData.nombres}
                     onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
-                    className={`w-full text-xs font-sans px-3 py-2.5 border rounded-sm bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white transition-all ${
+                    className={`w-full text-xs font-sans px-3 py-2.5 bg-white/75 text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white transition-all ${
                       errors.nombres ? 'border-red-400' : 'border-[#eaeaea]'
                     }`}
                     placeholder="E.g., Luis Carlos"
@@ -432,12 +435,12 @@ export const ProfileWizard: React.FC = () => {
           )}
 
           {/* Navigation controls */}
-          <div className="flex items-center justify-between gap-3 pt-4 border-t border-[#eaeaea]">
+          <div className="flex items-center justify-between gap-3 pt-4 border-t border-white/70">
             {currentStep > 1 ? (
               <button
                 type="button"
                 onClick={handlePrev}
-                className="px-4 py-2.5 border border-[#eaeaea] text-gray-700 hover:bg-gray-50 text-[11px] font-sans font-bold uppercase tracking-wider rounded-sm flex items-center gap-1 cursor-pointer transition-colors"
+                className="glass-button-secondary px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1"
               >
                 <ArrowLeft size={12} />
                 {t.prev}
@@ -446,31 +449,41 @@ export const ProfileWizard: React.FC = () => {
               <div />
             )}
 
-            {currentStep < 4 ? (
+            <div className="flex items-center gap-3 ml-auto">
+              {currentStep < 4 ? (
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="glass-button-primary px-5 py-3 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1"
+                >
+                  {t.next}
+                  <ArrowRight size={12} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="glass-button-primary px-5 py-3 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1"
+                >
+                  <CheckCircle size={13} />
+                  {t.finish}
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={handleNext}
-                className="px-5 py-2.5 bg-black text-white hover:bg-zinc-800 text-[11px] font-sans font-bold uppercase tracking-wider rounded-sm flex items-center gap-1 cursor-pointer transition-colors ml-auto"
+                onClick={logout}
+                className="glass-button-secondary px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-red-600 border-red-200 bg-red-50/70 hover:bg-red-50"
               >
-                {t.next}
-                <ArrowRight size={12} />
+                {t.logoutBtn}
               </button>
-            ) : (
-              <button
-                type="submit"
-                className="px-6 py-2.5 bg-black text-white hover:bg-emerald-800 hover:shadow-emerald-50 text-[11px] font-sans font-bold uppercase tracking-wider rounded-sm flex items-center gap-1.5 cursor-pointer transition-all ml-auto"
-              >
-                <CheckCircle size={13} />
-                {t.finish}
-              </button>
-            )}
+            </div>
           </div>
 
         </form>
 
         {/* Footprint Powered By VibeDesk */}
-        <div className="mt-8 pt-4 border-t border-[#eaeaea]/50 text-center">
-          <span className="text-[9px] font-sans font-semibold tracking-widest text-gray-400 uppercase">
+        <div className="mt-8 pt-4 border-t border-white/60 text-center">
+          <span className="text-[9px] font-sans font-semibold tracking-widest text-slate-500 uppercase">
             POWERED BY VIBEDESK
           </span>
         </div>

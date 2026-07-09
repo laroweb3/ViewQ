@@ -57,7 +57,7 @@ export interface SealingManifest {
     originalFilename?: string;
     sha3Hash: string;
     iv: string; // AES IV hex
-    encryptedData: string; // hex or base64 encrypted data
+    encryptedData: string; // b64:base64 or legacy hex encrypted data
   };
   stellarNotarization?: StellarNotarization;
   certifiedBy?: UserProfile;

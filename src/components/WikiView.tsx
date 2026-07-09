@@ -475,7 +475,7 @@ export const WikiView: React.FC = () => {
         </div>
 
         {/* Categories Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-[#fafafa]">
+        <div className="flex flex-wrap items-center gap-1.5 pb-2 border-b border-[#fafafa]">
           {categories.map((cat) => {
             const isSelected = selectedCategory === cat.id;
             return (

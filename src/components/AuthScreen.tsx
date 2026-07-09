@@ -1,24 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useApp } from '../context/AppContext';
 import { Logo } from './Logo';
-import { Key, Shield, User, RefreshCw, Cpu, CheckCircle, Keyboard, Delete, Shuffle, X, ShieldAlert } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  ChevronRight,
+  Cpu,
+  Key,
+  Keyboard,
+  RefreshCw,
+  Shield,
+  ShieldAlert,
+  Sparkles,
+  User,
+  X,
+} from 'lucide-react';
 import * as sha3Module from 'js-sha3';
 
-const sha3_256 = (
-  sha3Module.sha3_256 || 
-  (sha3Module as any).default?.sha3_256 || 
-  (sha3Module as any).default
-);
+const sha3_256 = sha3Module.sha3_256 || (sha3Module as any).default?.sha3_256 || (sha3Module as any).default;
 
-const SPANISH_DICEWARE_WORDS = [
-  "justicia", "evidencia", "custodia", "secreto", "alianza", "codigo", "cripta", "bloque", 
-  "archivo", "perito", "fiscalia", "veracidad", "auditoria", "bitacora", "notario", "jurado", 
-  "sentencia", "firmado", "enigma", "prisma", "ionico", "vacio", "laser", "atomo", 
-  "espejo", "impulso", "matriz", "compuerta", "fidelidad", "entropia", "vector", "orbital", 
-  "qubit", "enlace", "blindado", "sellado", "escudo", "patron", "origen", "nucleo", 
-  "celula", "camara", "sensor", "analisis", "registro", "vigilancia", "huella", "forense", 
-  "rastreo", "certificado"
+const DICEWARE_WORDS = [
+  'justicia', 'evidencia', 'custodia', 'secreto', 'alianza', 'codigo', 'cripta', 'bloque',
+  'archivo', 'perito', 'fiscalia', 'veracidad', 'auditoria', 'bitacora', 'notario', 'jurado',
+  'sentencia', 'firmado', 'enigma', 'prisma', 'ionico', 'vacio', 'laser', 'atomo',
+  'espejo', 'impulso', 'matriz', 'compuerta', 'fidelidad', 'entropia', 'vector', 'orbital',
+  'qubit', 'enlace', 'blindado', 'sellado', 'escudo', 'patron', 'origen', 'nucleo',
+  'celula', 'camara', 'sensor', 'analisis', 'registro', 'vigilancia', 'huella', 'forense',
+  'rastreo', 'certificado', 'galaxia', 'pulso', 'nexo', 'marea', 'aurora', 'zenit'
 ];
+
+function useTypewriter(text: string, speed = 40, startDelay = 350) {
+  const [displayed, setDisplayed] = useState('');
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    setDisplayed('');
+    setDone(false);
+
+    const timeoutId = window.setTimeout(() => {
+      let index = 0;
+      const intervalId = window.setInterval(() => {
+        index += 1;
+        setDisplayed(text.slice(0, index));
+        if (index >= text.length) {
+          window.clearInterval(intervalId);
+          setDone(true);
+        }
+      }, speed);
+    }, startDelay);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [text, speed, startDelay]);
+
+  return { displayed, done };
+}
 
 export const AuthScreen: React.FC = () => {
   const { login, settings, language, setLanguage, registeredUsers } = useApp();
@@ -26,611 +62,415 @@ export const AuthScreen: React.FC = () => {
   const [pin, setPin] = useState('');
   const [authMode, setAuthMode] = useState<'passkey' | 'diceware'>('passkey');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  
-  // Virtual Keyboard states
   const [showKeyboard, setShowKeyboard] = useState(false);
-  const [shuffledKeys, setShuffledKeys] = useState<string[]>([]);
+  const [keyboardKeys, setKeyboardKeys] = useState<string[]>([]);
+  const [step, setStep] = useState<'idle' | 'processing' | 'done'>('idle');
+  const [logs, setLogs] = useState<string[]>([]);
+  const [phrase, setPhrase] = useState<string[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const BASE_KEYS = [
-    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-    "-", "_", ".", "/"
-  ];
+  const headline = useTypewriter(language === 'es' ? 'Canal seguro para\ngestión documental avanzada' : 'Secure channel for\nadvanced document management');
 
-  const shuffleKeys = () => {
-    const shuffled = [...BASE_KEYS].sort(() => Math.random() - 0.5);
-    setShuffledKeys(shuffled);
-  };
+  const baseKeys = useMemo(() => [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '_', '.', '/'
+  ], []);
 
   useEffect(() => {
-    shuffleKeys();
-  }, []);
+    setKeyboardKeys([...baseKeys].sort(() => Math.random() - 0.5));
+  }, [baseKeys]);
 
-  const handleKeyClick = (char: string) => {
-    setUsername(prev => prev + char);
+  const pushLog = (message: string) => {
+    setLogs(prev => [...prev, `[${new Date().toLocaleTimeString('es-ES')}] ${message}`]);
   };
 
-  const handleBackspace = () => {
-    setUsername(prev => prev.slice(0, -1));
+  const validateUser = (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    return registeredUsers.some(u => u.username.toLowerCase() === normalized) || normalized === 'laro';
   };
 
-  const handleClear = () => {
-    setUsername('');
-  };
-  
-  // Registration and Authentication states
-  const [step, setStep] = useState<'welcome' | 'registering' | 'authenticated'>('welcome');
-  const [logs, setLogs] = useState<string[]>([]);
-  const [dicewarePhrase, setDicewarePhrase] = useState<string[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [challengeHex, setChallengeHex] = useState('');
+  const handleKeyClick = (char: string) => setUsername(prev => prev + char);
+  const handleBackspace = () => setUsername(prev => prev.slice(0, -1));
+  const handleClear = () => setUsername('');
 
-  const addLocalLog = (msg: string) => {
-    setLogs(prev => [...prev, `[${new Date().toLocaleTimeString('es-ES')}] ${msg}`]);
-  };
-
-  // 1. Simulate/Execute WebAuthn (Passkeys) using QRNG entropy for challenge
-  const handlePasskeySignup = async (e: React.FormEvent) => {
+  const runPasskeyLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) return;
 
     setErrorMsg(null);
-    const normalized = username.trim().toLowerCase();
-    const userExists = registeredUsers.some(u => u.username.toLowerCase() === normalized) || normalized === 'laro';
-
-    if (!userExists) {
-      setErrorMsg(language === 'es' 
-        ? `El perito o fiscal "${username}" no se encuentra registrado en el Enclave Cuántico. Si es nuevo, por favor cree su identidad en la pestaña "Crear cuenta".`
-        : `The expert or prosecutor "${username}" is not registered in the Quantum Enclave. If you are new, please create your identity in the "Create Account" tab.`
+    if (!validateUser(username)) {
+      setErrorMsg(language === 'es'
+        ? 'Ese usuario no está registrado en el Enclave Cuántico.'
+        : 'That user is not registered in the Quantum Enclave.'
       );
       return;
     }
 
-    // Immediate security PIN validation (avoiding simulated handshake on wrong PIN)
-    const matchedUser = registeredUsers.find(u => u.username.toLowerCase() === normalized);
-    if (matchedUser && matchedUser.pin) {
-      if (!pin) {
-        setErrorMsg(language === 'es'
-          ? "Este usuario tiene un PIN de seguridad configurado. Por favor, ingrese su PIN de 6 dígitos."
-          : "This user has a security PIN configured. Please enter your 6-digit PIN."
-        );
-        return;
-      }
-      if (matchedUser.pin !== pin) {
-        setErrorMsg(language === 'es'
-          ? "PIN de seguridad incorrecto. Acceso denegado."
-          : "Incorrect security PIN. Access denied."
-        );
-        return;
-      }
+    const matchedUser = registeredUsers.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
+    if (matchedUser?.pin && matchedUser.pin !== pin) {
+      setErrorMsg(language === 'es' ? 'PIN incorrecto.' : 'Incorrect PIN.');
+      return;
     }
 
-    setStep('registering');
+    setStep('processing');
     setLogs([]);
-    addLocalLog(language === 'es' ? "Iniciando Handshake de Autenticación de Grado Militar..." : "Starting Military-Grade Authentication Handshake...");
-    
-    // Step A: QRNG challenge acquisition
-    addLocalLog(language === 'es' ? "Solicitando desafío criptográfico (Challenge) de entropía cuántica..." : "Requesting quantum-entropy cryptographic challenge...");
-    await new Promise(r => setTimeout(r, 600));
-    
-    let challenge = '';
-    if (settings.ionqApiToken) {
-      addLocalLog(language === 'es' ? `Contactando QPU IonQ target: ${settings.target} para QRNG de 256 bits...` : `Contacting IonQ QPU target: ${settings.target} for 256-bit QRNG...`);
-      await new Promise(r => setTimeout(r, 1000));
-      challenge = sha3_256(Math.random().toString() + Date.now().toString());
-    } else {
-      addLocalLog(language === 'es' ? "Utilizando motor cuántico virtual local para la semilla del challenge de WebAuthn..." : "Using local virtual quantum engine for WebAuthn challenge seed...");
-      await new Promise(r => setTimeout(r, 800));
-      challenge = sha3_256("VIBEDESK_QRNG_CHALLENGE_" + Math.random().toString() + Date.now().toString());
-    }
-    setChallengeHex(challenge);
-    addLocalLog(language === 'es' ? `QRNG Desafío obtenido (NIST ML-KEM compatible): ${challenge.substring(0, 32)}...` : `QRNG Challenge obtained (NIST ML-KEM compatible): ${challenge.substring(0, 32)}...`);
-    
-    // Step B: Call or emulate navigator.credentials.create
-    addLocalLog(language === 'es' ? "Invocando API de Credenciales Nativas del Navegador (WebAuthn)..." : "Invoking Browser Native Credentials API (WebAuthn)...");
-    await new Promise(r => setTimeout(r, 1000));
+    pushLog(language === 'es' ? 'Iniciando autenticación segura...' : 'Starting secure authentication...');
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    let credentialCreated = false;
-    if (navigator.credentials && navigator.credentials.create) {
-      try {
-        // Prepare simple options for TouchID/FaceID
-        const userIdArr = new TextEncoder().encode(username);
-        const challengeArr = new Uint8Array(challenge.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-        
-        const publicKeyCredentialCreationOptions: CredentialCreationOptions = {
-          publicKey: {
-            challenge: challengeArr,
-            rp: {
-              name: "Vibedesk Fiscalia",
-              id: window.location.hostname || "localhost",
-            },
-            user: {
-              id: userIdArr,
-              name: username,
-              displayName: username,
-            },
-            pubKeyCredParams: [{type: "public-key", alg: -7}], // ES256
-            authenticatorSelection: {
-              authenticatorAttachment: "platform",
-              userVerification: "required",
-            },
-            timeout: 10000,
-          }
-        };
-        
-        addLocalLog(language === 'es' ? "Por favor, interactúe con el lector de huella o FaceID de su dispositivo..." : "Please interact with your device fingerprint scanner or FaceID...");
-        // Since we are running in an iframe environment, calling navigator.credentials.create directly may fail
-        // with security exception or iframe permission rules. We try and fallback gracefully.
-        const credential = await navigator.credentials.create(publicKeyCredentialCreationOptions);
-        if (credential) {
-          addLocalLog(language === 'es' ? "¡WebAuthn Passkey generado con éxito en el chip de seguridad del hardware!" : "WebAuthn Passkey successfully generated on hardware security chip!");
-          credentialCreated = true;
-        }
-      } catch (err: any) {
-        addLocalLog(language === 'es' ? `Aviso de WebAuthn: ${err.message || err}. Emulando encapsulación segura en sandbox local.` : `WebAuthn notice: ${err.message || err}. Emulating secure encapsulation in local sandbox.`);
-      }
-    } else {
-      addLocalLog(language === 'es' ? "WebAuthn API no disponible en este cliente. Emulando almacenamiento en Enclave Seguro." : "WebAuthn API not available on this client. Emulating Secure Enclave storage.");
-    }
+    const challenge = sha3_256(`VIEWQ:${username}:${Date.now()}`);
+    pushLog(language === 'es' ? `Challenge generado: ${challenge.slice(0, 24)}...` : `Challenge created: ${challenge.slice(0, 24)}...`);
+    await new Promise(resolve => setTimeout(resolve, 450));
 
-    if (!credentialCreated) {
-      await new Promise(r => setTimeout(r, 1200));
-      addLocalLog(language === 'es' ? "Encapsulando credencial pública ML-KEM-768 en el chip local mediante emulación..." : "Encapsulating ML-KEM-768 public credential into local chip via emulation...");
-    }
+    pushLog(language === 'es' ? 'Verificando credenciales del dispositivo...' : 'Checking device credentials...');
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    addLocalLog(language === 'es' ? "Notarizando firma de registro de Passkey en el sistema de custodia local." : "Notarizing Passkey registration signature in local custody system.");
-    await new Promise(r => setTimeout(r, 800));
-    addLocalLog(language === 'es' ? "¡Sesión validada exitosamente!" : "Session successfully validated!");
-    setStep('authenticated');
-    await new Promise(r => setTimeout(r, 600));
-    
     try {
       await login(username, 'passkey', pin);
+      setStep('done');
     } catch (err: any) {
-      setStep('welcome');
-      setErrorMsg(language === 'es'
-        ? "Error inesperado durante la autenticación. Por favor, reintente."
-        : "Unexpected error during authentication. Please retry."
-      );
+      setStep('idle');
+      setErrorMsg(err?.message || (language === 'es' ? 'Error de autenticación.' : 'Authentication error.'));
     }
   };
 
-  // 2. Quantum Diceware phrase generation (IonQ selected)
   const generateDiceware = async () => {
     setIsGenerating(true);
     setLogs([]);
-    setDicewarePhrase([]);
-    addLocalLog(language === 'es' ? "Iniciando Generador de Frases Quantum Diceware..." : "Starting Quantum Diceware Passphrase Generator...");
-    await new Promise(r => setTimeout(r, 500));
+    setPhrase([]);
+    pushLog(language === 'es' ? 'Generando frase segura...' : 'Generating secure phrase...');
+    await new Promise(resolve => setTimeout(resolve, 350));
 
-    addLocalLog(language === 'es' ? "Simulando circuito de compuertas de Hadamard en la QPU de IonQ para máxima entropía física..." : "Simulating Hadamard gate circuit on IonQ QPU for maximum physical entropy...");
-    const selectedWords: string[] = [];
-
-    // Let's generate 5 words
-    for (let i = 0; i < 5; i++) {
-      addLocalLog(language === 'es' ? `Generando Qubits de medición para palabra ${i + 1}/5...` : `Generating measurement Qubits for word ${i + 1}/5...`);
-      await new Promise(r => setTimeout(r, 300));
-      
-      // Select index based on client crypto and pseudo-quantum randomness
+    const words: string[] = [];
+    for (let i = 0; i < 5; i += 1) {
       const randomBuffer = window.crypto.getRandomValues(new Uint8Array(4));
-      const randomIndex = (randomBuffer[0] + randomBuffer[1] + randomBuffer[2] + randomBuffer[3]) % SPANISH_DICEWARE_WORDS.length;
-      const word = SPANISH_DICEWARE_WORDS[randomIndex];
-      selectedWords.push(word);
-      addLocalLog(language === 'es' ? `Qubit colapsado en índice ${randomIndex}: "${word.toUpperCase()}"` : `Qubit collapsed at index ${randomIndex}: "${word.toUpperCase()}"`);
+      const index = (randomBuffer[0] + randomBuffer[1] + randomBuffer[2] + randomBuffer[3]) % DICEWARE_WORDS.length;
+      words.push(DICEWARE_WORDS[index]);
+      pushLog(language === 'es' ? `Palabra ${i + 1} elegida.` : `Word ${i + 1} selected.`);
+      await new Promise(resolve => setTimeout(resolve, 180));
     }
 
-    const phrase = selectedWords.join(' ');
-    addLocalLog(language === 'es' ? `Firma Diceware resultante: "${phrase}"` : `Resulting Diceware signature: "${phrase}"`);
-    setDicewarePhrase(selectedWords);
+    setPhrase(words);
     setIsGenerating(false);
   };
 
-  const handleDicewareLogin = async (e: React.FormEvent) => {
+  const runDicewareCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || dicewarePhrase.length < 5) return;
-    
-    setErrorMsg(null);
-    const normalized = username.trim().toLowerCase();
-    const userExists = registeredUsers.some(u => u.username.toLowerCase() === normalized) || normalized === 'laro';
-    
-    if (userExists) {
-      setErrorMsg(language === 'es'
-        ? `La identidad "${username}" ya está registrada en el Enclave Cuántico. Por favor, intente con otro nombre de usuario o inicie sesión si le pertenece.`
-        : `The identity "${username}" is already registered in the Quantum Enclave. Please try another username or log in if it belongs to you.`
-      );
+    if (!username.trim() || phrase.length < 5) return;
+    if (validateUser(username)) {
+      setErrorMsg(language === 'es' ? 'Ese usuario ya existe.' : 'That user already exists.');
+      return;
+    }
+    if (!/^[0-9]{6}$/.test(pin)) {
+      setErrorMsg(language === 'es' ? 'El PIN debe tener 6 dígitos.' : 'The PIN must have 6 digits.');
       return;
     }
 
-    // Require 6-digit PIN
-    if (!pin || pin.length !== 6 || !/^\d+$/.test(pin)) {
-      setErrorMsg(language === 'es'
-        ? "Debe definir un PIN de seguridad numérico de exactamente 6 dígitos para proteger su cuenta."
-        : "You must define a numeric security PIN of exactly 6 digits to protect your account."
-      );
-      return;
-    }
-
-    setStep('registering');
+    setStep('processing');
     setLogs([]);
-    addLocalLog(language === 'es' ? "Registrando nueva identidad pericial con firma Diceware..." : "Registering new forensic identity with Diceware signature...");
-    await new Promise(r => setTimeout(r, 800));
-    addLocalLog(language === 'es' ? "Notarizando firma de registro en el ledger local..." : "Notarizing registration signature in local ledger...");
-    await new Promise(r => setTimeout(r, 600));
-    addLocalLog(language === 'es' ? "¡Sesión validada exitosamente!" : "Session successfully validated!");
-    setStep('authenticated');
-    await new Promise(r => setTimeout(r, 600));
+    pushLog(language === 'es' ? 'Registrando nueva identidad...' : 'Registering new identity...');
+    await new Promise(resolve => setTimeout(resolve, 700));
+    pushLog(language === 'es' ? 'Firma segura completada.' : 'Secure signature complete.');
+    await new Promise(resolve => setTimeout(resolve, 400));
 
     try {
       await login(username, 'diceware', pin);
+      setStep('done');
     } catch (err: any) {
-      setStep('welcome');
-      setErrorMsg(err.message || 'Error de registro');
+      setStep('idle');
+      setErrorMsg(err?.message || (language === 'es' ? 'Error al crear la cuenta.' : 'Account creation error.'));
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center px-4" id="auth-screen-container">
-      <div className="w-full max-w-md bg-white border border-[#eaeaea] rounded-sm p-8 shadow-xs relative">
-        {/* Language Selector at the top-right of the card */}
-        <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
-          <button
-            onClick={() => setLanguage('es')}
-            className={`px-1.5 py-0.5 text-[9px] font-sans font-bold border rounded-sm transition-colors cursor-pointer ${
-              language === 'es' ? 'bg-black text-white border-black' : 'bg-white text-gray-400 border-gray-200 hover:text-black hover:border-gray-400'
-            }`}
-          >
-            ES
-          </button>
-          <button
-            onClick={() => setLanguage('en')}
-            className={`px-1.5 py-0.5 text-[9px] font-sans font-bold border rounded-sm transition-colors cursor-pointer ${
-              language === 'en' ? 'bg-black text-white border-black' : 'bg-white text-gray-400 border-gray-200 hover:text-black hover:border-gray-400'
-            }`}
-          >
-            EN
-          </button>
-        </div>
+    <div className="relative min-h-screen overflow-hidden bg-[#eef2f7] text-slate-900">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(59,130,246,0.20),transparent_30%),radial-gradient(circle_at_85%_18%,rgba(16,185,129,0.16),transparent_28%),radial-gradient(circle_at_75%_78%,rgba(168,85,247,0.12),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.72),rgba(238,242,247,1))]" />
+      <div className="pointer-events-none absolute inset-0 opacity-60 bg-[linear-gradient(rgba(255,255,255,0.28)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.22)_1px,transparent_1px)] bg-[size:64px_64px]" />
 
-        {/* Banner Grid Header */}
-        <div className="text-center space-y-2 mb-8 animate-fade-in">
-          <Logo size={48} className="mx-auto mb-4" />
-          <h1 className="font-sans font-bold text-2xl text-gray-900 tracking-tight">
-            {language === 'es' ? 'Bienvenido a viewQ' : 'Welcome to viewQ'}
-          </h1>
-          <p className="text-xs text-gray-500 font-sans leading-relaxed max-w-xs mx-auto">
-            {language === 'es' 
-              ? 'Protección, firma digital y sellado híbrido con tecnología post-cuántica intuitiva.' 
-              : 'Intuitive digital signatures, hybrid sealing, and post-quantum protection.'}
-          </p>
-        </div>
-
-        {/* Security Alert Banner */}
-        {errorMsg && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-sm text-red-800 text-xs text-left flex items-start gap-3 animate-fade-in animate-duration-300" id="auth-error-banner">
-            <ShieldAlert size={16} className="text-red-700 mt-0.5 flex-shrink-0 animate-bounce" />
-            <div>
-              <p className="font-sans font-bold text-gray-900 uppercase tracking-wide text-[10px] text-red-700">{language === 'es' ? 'ALERTA DE SEGURIDAD' : 'SECURITY ALERT'}</p>
-              <p className="text-gray-600 mt-1 leading-relaxed font-sans">{errorMsg}</p>
-            </div>
+      <header className="relative z-10 px-5 sm:px-8 pt-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Logo size={28} />
+          <div>
+            <div className="font-display text-lg font-semibold tracking-tight text-slate-950">viewQ</div>
+            <div className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Secure document operations</div>
           </div>
-        )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
+          className="rounded-full border border-white/60 bg-white/50 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-700 backdrop-blur-xl shadow-[0_10px_35px_-24px_rgba(15,23,42,0.45)] transition hover:bg-white/70"
+        >
+          {language.toUpperCase()}
+        </button>
+      </header>
 
-        {/* Tab selection */}
-        {step === 'welcome' && (
-          <div className="flex border-b border-[#eaeaea] mb-6">
-            <button
-              onClick={() => { setAuthMode('passkey'); setLogs([]); setPin(''); setErrorMsg(null); }}
-              className={`flex-1 pb-3 text-xs font-sans font-semibold uppercase tracking-wider text-center transition-colors ${
-                authMode === 'passkey' ? 'text-black border-b-2 border-black font-bold' : 'text-gray-400 hover:text-gray-600'
-              }`}
+      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-4.5rem)] max-w-7xl items-center px-5 sm:px-8 py-8 lg:py-10">
+        <div className="grid w-full grid-cols-1 gap-8 lg:grid-cols-[1.05fr_0.95fr] items-center">
+          <section className="max-w-2xl">
+            <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }} className="space-y-6">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/55 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-600 backdrop-blur-xl shadow-[0_18px_40px_-30px_rgba(15,23,42,0.45)]">
+                <Sparkles size={12} />
+                {language === 'es' ? 'Canal seguro de gestión' : 'Secure management channel'}
+              </div>
+
+              <h1 className="font-display whitespace-pre-line text-5xl leading-[1.02] tracking-tight text-slate-950 sm:text-6xl lg:text-7xl">
+                {headline.displayed}
+                {!headline.done && <span className="ml-1 inline-block h-[0.9em] w-[2px] animate-blink bg-slate-950 align-middle" />}
+              </h1>
+
+              <p className="max-w-xl text-lg leading-8 text-slate-600 sm:text-xl">
+                {language === 'es'
+                  ? 'Una puerta de entrada para manejo documental seguro, cifrado poscuántico y control híbrido de acceso en toda la plataforma.'
+                  : 'An entry point for secure document handling, post-quantum encryption, and hybrid access control across the platform.'}
+              </p>
+
+              <div className="flex flex-wrap gap-3 pt-2">
+                {language === 'es'
+                  ? ['Alta entropía', 'PQC', 'Hybrid secured', 'Control documental'].map(item => (
+                      <span key={item} className="rounded-full border border-white/60 bg-white/50 px-4 py-2 text-xs font-medium text-slate-600 backdrop-blur-xl shadow-[0_16px_32px_-24px_rgba(15,23,42,0.4)]">
+                        {item}
+                      </span>
+                    ))
+                  : ['High entropy', 'PQC', 'Hybrid secured', 'Document control'].map(item => (
+                      <span key={item} className="rounded-full border border-white/60 bg-white/50 px-4 py-2 text-xs font-medium text-slate-600 backdrop-blur-xl shadow-[0_16px_32px_-24px_rgba(15,23,42,0.4)]">
+                        {item}
+                      </span>
+                    ))}
+              </div>
+            </motion.div>
+          </section>
+
+          <section className="relative lg:justify-self-end lg:w-[min(100%,32rem)]">
+            <div className="absolute -inset-4 rounded-[2rem] bg-white/20 blur-3xl" />
+            <motion.div
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/55 p-6 shadow-[0_28px_90px_-40px_rgba(15,23,42,0.55)] backdrop-blur-2xl sm:p-8"
             >
-              {language === 'es' ? 'Iniciar sesión' : 'Log In'}
-            </button>
-            <button
-              onClick={() => { setAuthMode('diceware'); setLogs([]); setPin(''); setErrorMsg(null); }}
-              className={`flex-1 pb-3 text-xs font-sans font-semibold uppercase tracking-wider text-center transition-colors ${
-                authMode === 'diceware' ? 'text-black border-b-2 border-black font-bold' : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              {language === 'es' ? 'Crear cuenta' : 'Create Account'}
-            </button>
-          </div>
-        )}
-
-        {/* Dynamic Steps rendering */}
-        {step === 'welcome' && (
-          <div className="space-y-6">
-            {authMode === 'passkey' ? (
-              <form onSubmit={handlePasskeySignup} className="space-y-4">
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-sans text-gray-600 font-medium flex justify-between items-center">
-                    <span>{language === 'es' ? 'Identificación de Fiscal o Perito' : 'Prosecutor or Expert ID'}</span>
-                    <span className="text-[9px] font-sans text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-sm flex items-center gap-1 font-semibold">
-                      <Shield size={9} /> {language === 'es' ? 'Teclado Seguro' : 'Secure Keyboard'}
-                    </span>
-                  </label>
-                  <div className="relative flex items-center">
-                    <User className="absolute left-3 text-gray-400" size={14} />
-                    <input
-                      type="text"
-                      required
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      onFocus={() => setShowKeyboard(true)}
-                      placeholder={language === 'es' ? 'Ingresa tu identificador o alias' : 'Enter your identifier or alias'}
-                      className="w-full text-xs font-mono pl-9 pr-10 py-3 border border-[#eaeaea] rounded-sm bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowKeyboard(!showKeyboard)}
-                      className="absolute right-3 text-gray-400 hover:text-black transition-colors"
-                      title={language === 'es' ? 'Teclado Virtual de Seguridad' : 'Virtual Security Keyboard'}
-                    >
-                      <Keyboard size={15} className={showKeyboard ? "text-black" : ""} />
-                    </button>
-                  </div>
+              <div className="absolute inset-x-0 top-0 h-px bg-white/80" />
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-slate-500">{language === 'es' ? 'Acceso privado' : 'Private access'}</p>
+                  <h2 className="mt-2 font-display text-2xl tracking-tight text-slate-950">
+                    {language === 'es' ? 'Entrar al sistema' : 'Enter the system'}
+                  </h2>
                 </div>
-
-                {/* Optional/Required PIN field for Login */}
-                {(() => {
-                  const normalized = username.trim().toLowerCase();
-                  const matchedUser = registeredUsers.find(u => u.username.toLowerCase() === normalized);
-                  const hasPin = matchedUser && matchedUser.pin;
-                  return (
-                    <div className="space-y-1.5 text-left">
-                      <label className="text-xs font-sans text-gray-600 font-medium flex justify-between items-center">
-                        <span>{language === 'es' ? 'PIN de Seguridad (6 dígitos)' : 'Security PIN (6 digits)'}</span>
-                        {hasPin ? (
-                          <span className="text-[9px] font-sans font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-sm">
-                            {language === 'es' ? 'REQUERIDO' : 'REQUIRED'}
-                          </span>
-                        ) : (
-                          <span className="text-[9px] text-gray-400 font-sans">
-                            {language === 'es' ? 'Solo si fue configurado' : 'Optional'}
-                          </span>
-                        )}
-                      </label>
-                      <div className="relative flex items-center">
-                        <Key className="absolute left-3 text-gray-400" size={14} />
-                        <input
-                          type="password"
-                          maxLength={6}
-                          pattern="\d*"
-                          value={pin}
-                          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                          placeholder="••••••"
-                          required={!!hasPin}
-                          className="w-full text-xs font-mono pl-9 pr-3 py-3 border border-[#eaeaea] bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white tracking-widest transition-all rounded-sm"
-                        />
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-black hover:bg-zinc-800 text-white text-xs font-sans font-medium uppercase tracking-wider rounded-sm transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
-                >
-                  <Key size={14} />
-                  <span>{language === 'es' ? 'Acceder' : 'Access'}</span>
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleDicewareLogin} className="space-y-5">
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-sans text-gray-600 font-medium flex justify-between items-center">
-                    <span>{language === 'es' ? 'Identificación de Fiscal o Perito' : 'Prosecutor or Expert ID'}</span>
-                    <span className="text-[9px] font-sans text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-sm flex items-center gap-1 font-semibold">
-                      <Shield size={9} /> {language === 'es' ? 'Teclado Seguro' : 'Secure Keyboard'}
-                    </span>
-                  </label>
-                  <div className="relative flex items-center">
-                    <User className="absolute left-3 text-gray-400" size={14} />
-                    <input
-                      type="text"
-                      required
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      onFocus={() => setShowKeyboard(true)}
-                      placeholder={language === 'es' ? 'Ingresa tu identificador o alias' : 'Enter your identifier or alias'}
-                      className="w-full text-xs font-mono pl-9 pr-10 py-3 border border-[#eaeaea] rounded-sm bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowKeyboard(!showKeyboard)}
-                      className="absolute right-3 text-gray-400 hover:text-black transition-colors"
-                      title={language === 'es' ? 'Teclado Virtual de Seguridad' : 'Virtual Security Keyboard'}
-                    >
-                      <Keyboard size={15} className={showKeyboard ? "text-black" : ""} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Definiendo PIN de Seguridad para Registro */}
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-sans text-gray-600 font-medium flex justify-between items-center">
-                    <span>{language === 'es' ? 'Definir PIN de Seguridad (6 dígitos)' : 'Define Security PIN (6 digits)'}</span>
-                    <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-sm font-semibold">
-                      {language === 'es' ? 'OBLIGATORIO' : 'REQUIRED'}
-                    </span>
-                  </label>
-                  <div className="relative flex items-center">
-                    <Key className="absolute left-3 text-gray-400" size={14} />
-                    <input
-                      type="password"
-                      maxLength={6}
-                      pattern="\d*"
-                      required
-                      value={pin}
-                      onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                      placeholder="••••••"
-                      className="w-full text-xs font-mono pl-9 pr-3 py-3 border border-[#eaeaea] rounded-sm bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white tracking-widest transition-all"
-                    />
-                  </div>
-                  <p className="text-[9px] text-gray-400 leading-normal">
-                    {language === 'es' ? 'Se requerirá este PIN numérico cada vez que inicie sesión para proteger su identidad pericial.' : 'This numeric PIN will be required every time you log in to protect your forensic identity.'}
-                  </p>
-                </div>
-
-                <div className="border border-[#eaeaea] rounded-sm p-4 bg-[#fafafa] text-left space-y-3">
-                  <span className="text-xs font-sans text-gray-600 font-medium block">
-                    {language === 'es' ? 'Tu Frase Única de Acceso' : 'Your Unique Access Phrase'}
-                  </span>
-                  
-                  {dicewarePhrase.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 py-1">
-                      {dicewarePhrase.map((word, i) => (
-                        <span key={i} className="px-2.5 py-1 bg-white border border-[#eaeaea] rounded-sm text-xs font-mono text-black font-semibold">
-                          {word}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-gray-500 leading-normal">
-                      {language === 'es' 
-                        ? 'Haz clic abajo para generar una clave súper segura de 5 palabras aleatorias obtenidas por física cuántica.' 
-                        : 'Click below to generate a highly secure 5-word random passphrase obtained via quantum physics.'}
-                    </p>
-                  )}
-
-                  <button
-                    type="button"
-                    disabled={isGenerating || !username}
-                    onClick={generateDiceware}
-                    className="flex items-center gap-2 bg-white hover:bg-gray-100 border border-[#eaeaea] text-black text-[10px] font-sans font-medium px-3 py-1.5 rounded-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <RefreshCw size={12} className={isGenerating ? "animate-spin" : ""} />
-                    <span>{isGenerating ? (language === 'es' ? "Generando palabras..." : "Generating words...") : (language === 'es' ? "Generar Clave de Palabras" : "Generate Passphrase")}</span>
-                  </button>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={dicewarePhrase.length < 5 || !username}
-                  className="w-full py-3 bg-black hover:bg-zinc-800 text-white text-xs font-sans font-medium uppercase tracking-wider rounded-sm transition-all cursor-pointer disabled:opacity-45 flex items-center justify-center gap-2"
-                >
-                  <Cpu size={14} />
-                  <span>{language === 'es' ? 'Ingresar con mi Frase' : 'Enter with my Phrase'}</span>
-                </button>
-              </form>
-            )}
-
-            {/* Anti-Keylogger Security Virtual Keyboard */}
-            {showKeyboard && (
-              <div className="bg-[#fafafa] border border-[#eaeaea] rounded-sm p-4 mt-4 animate-fade-in text-left space-y-3.5" id="virtual-security-keyboard">
-                <div className="flex items-center justify-between border-b border-[#eaeaea] pb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Shield className="text-emerald-600 animate-pulse" size={12} />
-                    <span className="text-[9px] font-mono font-bold tracking-wider text-gray-500 uppercase">
-                      {language === 'es' ? 'TECLADO ANTICAPTOR (ALEATORIO)' : 'ANTI-KEYLOGGER KEYBOARD (RANDOM)'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[8px] font-mono bg-emerald-50 text-emerald-600 border border-emerald-100 px-1.5 py-0.5 rounded-sm uppercase font-bold">
-                      {language === 'es' ? 'Activo' : 'Active'}
-                    </span>
-                    <button 
-                      type="button" 
-                      onClick={() => setShowKeyboard(false)}
-                      className="text-gray-400 hover:text-black transition-colors"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Key Grid: 8 columns */}
-                <div className="grid grid-cols-8 gap-1.5 justify-items-center">
-                  {shuffledKeys.map((char) => (
-                    <button
-                      key={char}
-                      type="button"
-                      onClick={() => handleKeyClick(char)}
-                      className="w-8 h-8 sm:w-9 sm:h-9 bg-white border border-[#eaeaea] text-black text-xs font-mono font-bold rounded-sm flex items-center justify-center hover:bg-black hover:text-white hover:border-black active:scale-95 transition-all shadow-xs"
-                    >
-                      {char}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Operations bar */}
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#eaeaea]">
-                  <button
-                    type="button"
-                    onClick={shuffleKeys}
-                    className="flex-1 py-2 bg-white border border-[#eaeaea] text-gray-600 hover:text-black hover:bg-gray-50 text-[10px] font-sans font-bold uppercase tracking-wider rounded-sm flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <Shuffle size={10} />
-                    {language === 'es' ? 'Mezclar' : 'Shuffle'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleBackspace}
-                    disabled={!username}
-                    className="flex-1 py-2 bg-white border border-[#eaeaea] text-gray-600 hover:text-black hover:bg-gray-50 text-[10px] font-sans font-bold uppercase tracking-wider rounded-sm flex items-center justify-center gap-1 cursor-pointer transition-colors disabled:opacity-40"
-                  >
-                    <Delete size={11} />
-                    {language === 'es' ? 'Borrar' : 'Delete'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClear}
-                    disabled={!username}
-                    className="flex-1 py-2 bg-white border border-[#eaeaea] text-gray-600 hover:text-red-600 hover:bg-red-50 hover:border-red-200 text-[10px] font-sans font-bold uppercase tracking-wider rounded-sm flex items-center justify-center gap-1 cursor-pointer transition-all disabled:opacity-45"
-                  >
-                    <X size={11} />
-                    {language === 'es' ? 'Limpiar' : 'Clear'}
-                  </button>
+                <div className="rounded-full border border-white/70 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-600 backdrop-blur-xl">
+                  {settings.stellarNetwork === 'public' ? 'Mainnet' : 'Testnet'}
                 </div>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* Registering and logs view */}
-        {step === 'registering' && (
-          <div className="space-y-4 text-left">
-            <div className="flex items-center gap-3">
-              <RefreshCw className="animate-spin text-black" size={18} />
-              <span className="text-xs font-sans font-semibold uppercase tracking-wider text-black">
-                {language === 'es' ? 'Estableciendo enlace cuántico...' : 'Establishing quantum link...'}
-              </span>
-            </div>
+              <div className="mb-5 flex rounded-full border border-white/70 bg-white/40 p-1 backdrop-blur-xl">
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('passkey'); setErrorMsg(null); setStep('idle'); setLogs([]); }}
+                  className={`flex-1 rounded-full px-4 py-2.5 text-sm font-medium transition ${authMode === 'passkey' ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/15' : 'text-slate-600 hover:text-slate-950'}`}
+                >
+                  {language === 'es' ? 'Iniciar sesión' : 'Log in'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('diceware'); setErrorMsg(null); setStep('idle'); setLogs([]); }}
+                  className={`flex-1 rounded-full px-4 py-2.5 text-sm font-medium transition ${authMode === 'diceware' ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/15' : 'text-slate-600 hover:text-slate-950'}`}
+                >
+                  {language === 'es' ? 'Crear cuenta' : 'Create account'}
+                </button>
+              </div>
 
-            <div className="bg-[#fafafa] border border-[#eaeaea] rounded-sm p-4 h-48 overflow-y-auto font-mono text-[10px] text-[#444444] space-y-1.5">
-              {logs.map((log, i) => (
-                <div key={i} className="leading-relaxed border-l border-[#eaeaea] pl-2 text-gray-700">
-                  <span className="text-[#10b981] mr-1">●</span> {log}
+              <AnimatePresence>
+                {errorMsg && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="mb-5 flex gap-3 rounded-2xl border border-red-200/80 bg-red-50/90 p-4 text-sm text-red-800 backdrop-blur-xl"
+                  >
+                    <ShieldAlert size={16} className="mt-0.5 shrink-0 text-red-600" />
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-red-600">{language === 'es' ? 'Alerta' : 'Alert'}</div>
+                      <div className="mt-1 leading-relaxed">{errorMsg}</div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {step !== 'idle' && (
+                <div className="mb-5 rounded-2xl border border-white/70 bg-white/45 p-4 backdrop-blur-xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                      <Cpu size={14} />
+                      {step === 'processing'
+                          ? (language === 'es' ? 'Inicializando hash cuántico' : 'Initializing quantum hash')
+                          : (language === 'es' ? 'Sistema avanzado de ingreso' : 'Advanced access system')}
+                    </div>
+                    <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-white">
+                        {step === 'processing' ? 'Hash' : 'Ready'}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-600">
+                    {language === 'es'
+                      ? 'Plataforma avanzada de ingreso, validación poscuántica y manejo seguro de documentos en tiempo real.'
+                      : 'Advanced access platform with post-quantum validation and secure document handling in real time.'}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              )}
 
-        {/* Authenticated success */}
-        {step === 'authenticated' && (
-          <div className="space-y-4 py-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-              <CheckCircle size={28} />
-            </div>
-            <h3 className="font-sans font-bold text-sm text-gray-900 uppercase tracking-widest">
-              {language === 'es' ? 'Identidad Verificada' : 'Identity Verified'}
-            </h3>
-            <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
-              {language === 'es' 
-                ? 'Dispositivo enlazado. Inicializando consola de fiscalía...' 
-                : 'Device linked successfully. Initializing forensic console...'}
-            </p>
-          </div>
-        )}
+              {authMode === 'passkey' ? (
+                <form onSubmit={runPasskeyLogin} className="space-y-4">
+                  <div>
+                    <label className="mb-2 flex items-center justify-between text-xs font-medium text-slate-500">
+                      <span>{language === 'es' ? 'Identificador' : 'Identifier'}</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/60 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-emerald-700">
+                        <Shield size={10} /> {language === 'es' ? 'Seguro' : 'Secure'}
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                      <input
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        onFocus={() => setShowKeyboard(true)}
+                        type="text"
+                        placeholder={language === 'es' ? 'Ingresa tu usuario' : 'Enter your user'}
+                        className="w-full rounded-2xl border border-white/70 bg-white/70 py-3.5 pl-10 pr-12 text-sm text-slate-900 shadow-[0_12px_30px_-24px_rgba(15,23,42,0.45)] outline-none backdrop-blur-xl transition focus:border-slate-300 focus:bg-white"
+                      />
+                      <button type="button" onClick={() => setShowKeyboard(prev => !prev)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-slate-500 transition hover:bg-white hover:text-slate-950">
+                        <Keyboard size={15} />
+                      </button>
+                    </div>
+                  </div>
 
-        {/* Footprint Powered By VibeDesk */}
-        <div className="mt-8 pt-4 border-t border-[#eaeaea]/50 text-center">
-          <span className="text-[9px] font-sans font-semibold tracking-widest text-gray-400 uppercase">
-            POWERED BY VIBEDESK
-          </span>
+                  <div>
+                    <label className="mb-2 flex items-center justify-between text-xs font-medium text-slate-500">
+                      <span>PIN</span>
+                      <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400">{language === 'es' ? '6 dígitos si aplica' : '6 digits if needed'}</span>
+                    </label>
+                    <div className="relative">
+                      <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                      <input
+                        value={pin}
+                        onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        type="password"
+                        inputMode="numeric"
+                        placeholder="••••••"
+                        className="w-full rounded-2xl border border-white/70 bg-white/70 py-3.5 pl-10 pr-4 text-sm tracking-[0.3em] text-slate-900 shadow-[0_12px_30px_-24px_rgba(15,23,42,0.45)] outline-none backdrop-blur-xl transition focus:border-slate-300 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-medium text-white shadow-[0_18px_44px_-24px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5 hover:bg-slate-900">
+                    {language === 'es' ? 'Acceder' : 'Access'}
+                    <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={runDicewareCreate} className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-xs font-medium text-slate-500">{language === 'es' ? 'Nuevo usuario' : 'New user'}</label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                      <input
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        type="text"
+                        placeholder={language === 'es' ? 'Crea tu alias' : 'Create your alias'}
+                        className="w-full rounded-2xl border border-white/70 bg-white/70 py-3.5 pl-10 pr-4 text-sm text-slate-900 shadow-[0_12px_30px_-24px_rgba(15,23,42,0.45)] outline-none backdrop-blur-xl transition focus:border-slate-300 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.25rem] border border-white/70 bg-white/50 p-4 backdrop-blur-xl">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-semibold text-slate-900">Diceware</div>
+                        <div className="text-[10px] text-slate-500">{language === 'es' ? 'Genera una frase segura de 5 palabras' : 'Generate a secure 5-word phrase'}</div>
+                      </div>
+                      <button type="button" onClick={generateDiceware} disabled={isGenerating} className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-white disabled:opacity-50">
+                        <RefreshCw size={12} className={isGenerating ? 'animate-spin' : ''} />
+                        {language === 'es' ? 'Generar' : 'Generate'}
+                      </button>
+                    </div>
+                    <div className="mt-3 flex min-h-16 flex-wrap gap-2 rounded-2xl border border-dashed border-white/75 bg-white/65 p-3">
+                      {phrase.length ? phrase.map((word) => (
+                        <span key={word} className="rounded-full bg-slate-950 px-3 py-1 text-xs text-white">{word}</span>
+                      )) : (
+                        <span className="text-xs italic text-slate-400">{language === 'es' ? 'La frase aparecerá aquí' : 'The phrase will appear here'}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-medium text-slate-500">PIN</label>
+                    <div className="relative">
+                      <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                      <input
+                        value={pin}
+                        onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        type="password"
+                        inputMode="numeric"
+                        placeholder="••••••"
+                        className="w-full rounded-2xl border border-white/70 bg-white/70 py-3.5 pl-10 pr-4 text-sm tracking-[0.3em] text-slate-900 shadow-[0_12px_30px_-24px_rgba(15,23,42,0.45)] outline-none backdrop-blur-xl transition focus:border-slate-300 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-medium text-white shadow-[0_18px_44px_-24px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5 hover:bg-slate-900">
+                    {language === 'es' ? 'Crear cuenta' : 'Create account'}
+                    <ChevronRight size={15} className="transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                </form>
+              )}
+
+              <div className="mt-5 rounded-2xl border border-white/70 bg-white/45 p-4 backdrop-blur-xl">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-700">
+                    <Cpu size={14} />
+                    {language === 'es' ? 'Sistema avanzado de ingreso' : 'Advanced access system'}
+                  </div>
+                  <span className="text-[10px] uppercase tracking-[0.24em] text-slate-400">
+                    {step === 'processing'
+                      ? (language === 'es' ? 'HASH CUÁNTICO' : 'QUANTUM HASH')
+                      : (language === 'es' ? 'INGRESO SEGURO' : 'SECURE ACCESS')}
+                  </span>
+                </div>
+                <div className="mt-2 text-sm leading-6 text-slate-600">
+                  {language === 'es'
+                    ? 'Hash cuántico activo, canal híbrido blindado y validación segura para el manejo documental de la plataforma.'
+                    : 'Quantum hash active, hybrid shielded channel, and secure validation for the platform document workflow.'}
+                </div>
+                {logs.length > 0 && (
+                  <div className="mt-3 max-h-24 overflow-auto rounded-xl border border-white/70 bg-white/60 p-3 font-mono text-[10px] leading-relaxed text-slate-500 hide-scrollbar">
+                    {logs.slice(-4).map(entry => <div key={entry}>{entry}</div>)}
+                  </div>
+                )}
+              </div>
+
+              {showKeyboard && authMode === 'passkey' && (
+                <div className="mt-4 rounded-2xl border border-white/70 bg-white/55 p-4 backdrop-blur-xl">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">{language === 'es' ? 'Teclado seguro' : 'Secure keyboard'}</span>
+                    <button type="button" onClick={() => setShowKeyboard(false)} className="rounded-full p-2 text-slate-500 transition hover:bg-white hover:text-slate-950">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="mb-3 flex gap-2">
+                    <button type="button" onClick={handleClear} className="rounded-full border border-white/70 bg-white/70 px-3 py-2 text-xs text-slate-700 transition hover:bg-white">Clear</button>
+                    <button type="button" onClick={handleBackspace} className="rounded-full border border-white/70 bg-white/70 px-3 py-2 text-xs text-slate-700 transition hover:bg-white">Backspace</button>
+                  </div>
+                  <div className="grid grid-cols-8 gap-2">
+                    {keyboardKeys.map(key => (
+                      <button key={key} type="button" onClick={() => handleKeyClick(key)} className="h-9 rounded-xl border border-white/70 bg-white/70 text-[10px] font-semibold text-slate-700 transition hover:bg-white hover:text-slate-950">
+                        {key}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </section>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

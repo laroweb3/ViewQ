@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { unsealPayload } from '../lib/pqc';
 import { VaultRecord } from '../types';
 import { translations } from '../translations';
+import { ProcessEventFeed } from './ProcessEventFeed';
 import { 
   Database, 
   Trash2, 
@@ -201,48 +202,48 @@ export const HistoryView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-8 max-w-7xl mx-auto">
       {/* Header section */}
-      <div className="border-b border-[#eaeaea] pb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="border-b border-slate-200/80 pb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-sans font-semibold tracking-tight text-2xl text-[#111111]" id="history-title">
+          <h1 className="font-display font-semibold tracking-tight text-3xl text-slate-950" id="history-title">
             {t.historyTitle}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-slate-500 mt-1 max-w-2xl">
             {t.historySub}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs font-sans text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-sm">
-          <Database size={14} className="text-gray-400" />
-          <span>{language === 'es' ? 'EXPEDIENTES ACTIVOS: ' : 'ACTIVE CASE RECORDS: '}<strong className="text-black font-semibold">{myVaults.length}</strong></span>
+        <div className="inline-flex items-center gap-2 text-xs font-sans text-slate-600 bg-white/80 border border-slate-200 px-4 py-2 rounded-full shadow-sm">
+          <Database size={14} className="text-slate-400" />
+          <span>{language === 'es' ? 'EXPEDIENTES ACTIVOS: ' : 'ACTIVE CASE RECORDS: '}<strong className="text-slate-950 font-semibold">{myVaults.length}</strong></span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left hand side: Vault records list */}
-        <div className="lg:col-span-1 space-y-4 max-h-[600px] overflow-y-auto pr-1">
-          <h3 className="font-sans font-semibold text-xs text-gray-400 uppercase tracking-wider mb-2">
-            {language === 'es' ? 'Archivos Sellados' : 'Sealed Files'}
-          </h3>
+        <div className="lg:col-span-1 flex flex-col gap-4 lg:h-[calc(100vh-13rem)] lg:sticky lg:top-6 min-h-0">
+          <div className="space-y-3 bg-white/90 backdrop-blur-xl border border-slate-200/80 p-4 rounded-[24px] shadow-[0_18px_45px_-30px_rgba(15,23,42,0.35)]">
+            <h3 className="font-sans font-semibold text-xs text-slate-400 uppercase tracking-[0.24em]">
+              {language === 'es' ? 'Archivos Sellados' : 'Sealed Files'}
+            </h3>
 
-          {/* Search and Quick Filters */}
-          <div className="space-y-3 bg-white border border-[#eaeaea] p-3 rounded-sm shadow-2xs">
+            {/* Search and Quick Filters */}
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <Search size={14} className="text-gray-400" />
+                <Search size={14} className="text-slate-400" />
               </span>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={language === 'es' ? 'Buscar por expediente o notas...' : 'Search by record or notes...'}
-                className="w-full text-xs pl-9 pr-8 py-2 border border-gray-200 rounded-sm focus:outline-none focus:border-black font-sans transition-colors placeholder:text-gray-400 bg-[#fafafa] focus:bg-white"
+                className="w-full text-xs pl-9 pr-8 py-2.5 border border-slate-200 rounded-2xl focus:outline-none focus:border-slate-950 font-sans transition-colors placeholder:text-slate-400 bg-slate-50 focus:bg-white"
                 id="vault-search-input"
               />
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-400 hover:text-black cursor-pointer"
+                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-950 cursor-pointer"
                   id="clear-vault-search-btn"
                 >
                   <X size={14} />
@@ -254,10 +255,10 @@ export const HistoryView: React.FC = () => {
             <div className="flex gap-1.5 pt-0.5">
               <button
                 onClick={() => setFilterType('all')}
-                className={`px-2.5 py-1 text-[10px] font-sans font-medium rounded-sm border transition-all cursor-pointer ${
+                className={`px-2.5 py-1 text-[10px] font-sans font-medium rounded-full border transition-all cursor-pointer ${
                   filterType === 'all'
-                    ? 'bg-black text-white border-black'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-black'
+                    ? 'bg-slate-950 text-white border-slate-950'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400 hover:text-slate-950'
                 }`}
                 id="filter-all-btn"
               >
@@ -265,10 +266,10 @@ export const HistoryView: React.FC = () => {
               </button>
               <button
                 onClick={() => setFilterType('qpu')}
-                className={`px-2.5 py-1 text-[10px] font-sans font-medium rounded-sm border transition-all cursor-pointer ${
+                className={`px-2.5 py-1 text-[10px] font-sans font-medium rounded-full border transition-all cursor-pointer ${
                   filterType === 'qpu'
-                    ? 'bg-black text-white border-black'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-black'
+                    ? 'bg-slate-950 text-white border-slate-950'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400 hover:text-slate-950'
                 }`}
                 id="filter-qpu-btn"
               >
@@ -276,10 +277,10 @@ export const HistoryView: React.FC = () => {
               </button>
               <button
                 onClick={() => setFilterType('sim')}
-                className={`px-2.5 py-1 text-[10px] font-sans font-medium rounded-sm border transition-all cursor-pointer ${
+                className={`px-2.5 py-1 text-[10px] font-sans font-medium rounded-full border transition-all cursor-pointer ${
                   filterType === 'sim'
-                    ? 'bg-black text-white border-black'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-black'
+                    ? 'bg-slate-950 text-white border-slate-950'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400 hover:text-slate-950'
                 }`}
                 id="filter-sim-btn"
               >
@@ -289,7 +290,7 @@ export const HistoryView: React.FC = () => {
             
             {/* Search counts or Reset option */}
             {(searchTerm || filterType !== 'all') && (
-              <div className="text-[10px] text-gray-500 font-sans flex justify-between items-center bg-gray-50 px-2.5 py-1 rounded-sm border border-gray-100">
+              <div className="text-[10px] text-slate-500 font-sans flex justify-between items-center bg-slate-50 px-3 py-1.5 rounded-2xl border border-slate-200">
                 <span>
                   {language === 'es' 
                     ? `Encontrados: ${filteredVaults.length} de ${myVaults.length}` 
@@ -300,7 +301,7 @@ export const HistoryView: React.FC = () => {
                     setSearchTerm('');
                     setFilterType('all');
                   }}
-                  className="text-black font-semibold hover:underline cursor-pointer"
+                  className="text-slate-950 font-semibold hover:underline cursor-pointer"
                   id="reset-vault-filters-btn"
                 >
                   {language === 'es' ? 'Restablecer' : 'Reset'}
@@ -309,100 +310,102 @@ export const HistoryView: React.FC = () => {
             )}
           </div>
 
-          {myVaults.length === 0 ? (
-            <div className="border border-[#eaeaea] rounded-sm p-8 text-center text-gray-400 bg-[#fafafa]">
-              <Database size={24} className="mx-auto text-gray-300 mb-2" />
-              <p className="text-xs font-semibold text-gray-600">{language === 'es' ? 'Bóveda vacía' : 'Vault empty'}</p>
-              <p className="text-[11px] mt-1 text-gray-400 leading-normal">
-                {t.emptyHistory}
-              </p>
-            </div>
-          ) : filteredVaults.length === 0 ? (
-            <div className="border border-[#eaeaea] rounded-sm p-8 text-center text-gray-400 bg-[#fafafa]">
-              <Search size={24} className="mx-auto text-gray-300 mb-2 text-gray-300" />
-              <p className="text-xs font-semibold text-gray-600">
-                {language === 'es' ? 'Sin resultados' : 'No results found'}
-              </p>
-              <p className="text-[11px] mt-1 text-gray-400 leading-normal">
-                {language === 'es' 
-                  ? 'No se encontraron expedientes que coincidan con los criterios de búsqueda.' 
-                  : 'No case records found matching your search criteria.'}
-              </p>
-            </div>
-          ) : (
-            filteredVaults.map((record) => {
-              const isSelected = selectedVault?.id === record.id;
-              const dateStr = new Date(record.timestamp).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              });
+          <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar pr-1 space-y-4">
+            {myVaults.length === 0 ? (
+              <div className="border border-slate-200 rounded-[24px] p-8 text-center text-slate-400 bg-slate-50/80 backdrop-blur-xl">
+                <Database size={24} className="mx-auto text-slate-300 mb-2" />
+                <p className="text-xs font-semibold text-slate-600">{language === 'es' ? 'Bóveda vacía' : 'Vault empty'}</p>
+                <p className="text-[11px] mt-1 text-slate-400 leading-normal">
+                  {t.emptyHistory}
+                </p>
+              </div>
+            ) : filteredVaults.length === 0 ? (
+              <div className="border border-slate-200 rounded-[24px] p-8 text-center text-slate-400 bg-slate-50/80 backdrop-blur-xl">
+                <Search size={24} className="mx-auto text-slate-300 mb-2 text-slate-300" />
+                <p className="text-xs font-semibold text-slate-600">
+                  {language === 'es' ? 'Sin resultados' : 'No results found'}
+                </p>
+                <p className="text-[11px] mt-1 text-slate-400 leading-normal">
+                  {language === 'es' 
+                    ? 'No se encontraron expedientes que coincidan con los criterios de búsqueda.' 
+                    : 'No case records found matching your search criteria.'}
+                </p>
+              </div>
+            ) : (
+              filteredVaults.map((record) => {
+                const isSelected = selectedVault?.id === record.id;
+                const dateStr = new Date(record.timestamp).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
 
-              return (
-                <div
-                  key={record.id}
-                  id={`vault-item-${record.id}`}
-                  onClick={() => {
-                    setSelectedVault(record);
-                    setDecryptedText(null);
-                    setDecryptError(null);
-                  }}
-                  className={`border p-4 rounded-sm cursor-pointer transition-all duration-200 relative group text-left ${
-                    isSelected 
-                      ? 'border-black bg-white shadow-xs' 
-                      : 'border-[#eaeaea] bg-[#fafafa] hover:bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex justify-between items-start gap-2 mb-2">
-                    <span className="text-[10px] font-mono font-semibold text-gray-400 uppercase tracking-wider block">
-                      {record.manifest.quantumSource.isSimulated ? (language === 'es' ? 'Virtual Local' : 'Virtual Local') : (language === 'es' ? 'QPU Remoto' : 'Remote QPU')}
-                    </span>
-                    <button
-                      onClick={(e) => handleDelete(record.id, e)}
-                      className="text-gray-400 hover:text-red-600 p-1 rounded-sm hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
-                      title={language === 'es' ? 'Eliminar registro' : 'Delete record'}
-                      id={`delete-vault-btn-${record.id}`}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                return (
+                  <div
+                    key={record.id}
+                    id={`vault-item-${record.id}`}
+                    onClick={() => {
+                      setSelectedVault(record);
+                      setDecryptedText(null);
+                      setDecryptError(null);
+                    }}
+                    className={`border p-4 rounded-2xl cursor-pointer transition-all duration-200 relative group text-left ${
+                      isSelected 
+                        ? 'border-slate-950 bg-white shadow-[0_18px_35px_-24px_rgba(15,23,42,0.85)]' 
+                        : 'border-slate-200 bg-white/80 hover:bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-2 mb-2">
+                      <span className="text-[10px] font-mono font-semibold text-slate-400 uppercase tracking-[0.22em] block">
+                        {record.manifest.quantumSource.isSimulated ? (language === 'es' ? 'Virtual Local' : 'Virtual Local') : (language === 'es' ? 'QPU Remoto' : 'Remote QPU')}
+                      </span>
+                      <button
+                        onClick={(e) => handleDelete(record.id, e)}
+                        className="text-slate-400 hover:text-red-600 p-1 rounded-xl hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+                        title={language === 'es' ? 'Eliminar registro' : 'Delete record'}
+                        id={`delete-vault-btn-${record.id}`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+
+                    <h4 className="text-xs font-semibold text-slate-950 leading-snug line-clamp-2 pr-6">
+                      {record.title}
+                    </h4>
+                    
+                    {record.notes && (
+                      <p className="text-[10px] text-slate-400 mt-1 line-clamp-1 italic font-sans">
+                        "{record.notes}"
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-4 mt-3 pt-2.5 border-t border-slate-200/50 text-[10px] text-slate-400 font-mono">
+                      <span className="flex items-center gap-1">
+                        <Clock size={11} />
+                        {dateStr}
+                      </span>
+                      <span className="flex items-center gap-1 uppercase">
+                        <Cpu size={11} />
+                        {record.manifest.quantumSource.target.replace('ionq.', '')}
+                      </span>
+                    </div>
                   </div>
-
-                  <h4 className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2 pr-6">
-                    {record.title}
-                  </h4>
-                  
-                  {record.notes && (
-                    <p className="text-[10px] text-gray-400 mt-1 line-clamp-1 italic font-sans">
-                      "{record.notes}"
-                    </p>
-                  )}
-
-                  <div className="flex items-center gap-4 mt-3 pt-2.5 border-t border-gray-100/50 text-[10px] text-gray-400 font-mono">
-                    <span className="flex items-center gap-1">
-                      <Clock size={11} />
-                      {dateStr}
-                    </span>
-                    <span className="flex items-center gap-1 uppercase">
-                      <Cpu size={11} />
-                      {record.manifest.quantumSource.target.replace('ionq.', '')}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
 
         {/* Right hand side: Inspector Panel */}
         <div className="lg:col-span-2">
           {selectedVault ? (
-            <div className="bg-white border border-[#eaeaea] rounded-sm p-6 md:p-8 space-y-6" id="vault-inspector-panel">
+            <div className="glass-surface rounded-[28px] p-6 md:p-8 space-y-6" id="vault-inspector-panel">
               {/* Card Title & General Info */}
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-[#eaeaea] pb-5">
                 <div className="text-left">
-                  <span className="text-[10px] font-mono uppercase text-gray-400 font-semibold bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-sm">
+                  <span className="glass-badge px-2 py-0.5 text-[10px] font-mono uppercase font-semibold text-slate-500">
                     ID: {selectedVault.id}
                   </span>
                   <h3 className="font-sans font-semibold text-xl text-gray-900 mt-2 leading-snug">
@@ -414,7 +417,7 @@ export const HistoryView: React.FC = () => {
                       {new Date(selectedVault.timestamp).toLocaleString(language === 'es' ? 'es-ES' : 'en-US')}
                     </span>
                     {selectedVault.manifest.payload.originalFilename && (
-                      <span className="flex items-center gap-1 text-black font-semibold bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-sm">
+                      <span className="flex items-center gap-1 text-slate-950 font-semibold glass-badge px-2 py-0.5 rounded-full">
                         <FileText size={12} className="text-gray-400" />
                         {selectedVault.manifest.payload.originalFilename}
                       </span>
@@ -443,7 +446,7 @@ export const HistoryView: React.FC = () => {
                         }
                       }}
                       disabled={isDownloading}
-                      className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 px-3 py-1.5 rounded-sm text-xs font-sans font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="glass-button-secondary px-3 py-1.5 text-xs font-semibold text-emerald-700 border-emerald-200 bg-emerald-50/70 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       title={language === 'es' ? 'Descargar Archivo Blindado con Metadatos Inyectados' : 'Download Shielded File with Injected Metadata'}
                       id="download-history-armored-btn"
                     >
@@ -456,7 +459,7 @@ export const HistoryView: React.FC = () => {
                   
                   <button
                     onClick={() => copyManifest(selectedVault)}
-                    className="p-2 rounded-sm bg-[#fafafa] border border-[#eaeaea] hover:bg-gray-50 text-gray-600 hover:text-black transition-colors"
+                    className="glass-button-secondary p-2 rounded-2xl text-slate-600 hover:text-slate-950"
                     title={language === 'es' ? 'Copiar Manifiesto JSON' : 'Copy JSON Manifest'}
                     id="copy-history-manifest-btn"
                   >
@@ -472,24 +475,24 @@ export const HistoryView: React.FC = () => {
                   onClick={() => setInspectorTab('roadmap')}
                   className={`flex-1 pb-3 text-center text-xs font-sans font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
                     inspectorTab === 'roadmap'
-                      ? 'border-black text-black'
-                      : 'border-transparent text-gray-400 hover:text-black'
+                      ? 'border-slate-950 text-slate-950'
+                      : 'border-transparent text-slate-400 hover:text-slate-950'
                   }`}
                   id="tab-btn-roadmap"
                 >
-                  {language === 'es' ? 'Camino de Custodia (Simple)' : 'Custody Roadmap (Simple)'}
+                  {language === 'es' ? 'Mapa de Custodia' : 'Custody Map'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setInspectorTab('technical')}
                   className={`flex-1 pb-3 text-center text-xs font-sans font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
                     inspectorTab === 'technical'
-                      ? 'border-black text-black'
-                      : 'border-transparent text-gray-400 hover:text-black'
+                      ? 'border-slate-950 text-slate-950'
+                      : 'border-transparent text-slate-400 hover:text-slate-950'
                   }`}
                   id="tab-btn-technical"
                 >
-                  {language === 'es' ? 'Detalles Técnicos (Avanzado)' : 'Technical Details (Advanced)'}
+                  {language === 'es' ? 'Detalles Técnicos' : 'Technical Details'}
                 </button>
               </div>
 
@@ -505,9 +508,69 @@ export const HistoryView: React.FC = () => {
                 const sigDateString = selectedVault.signatureTimestamp 
                   ? new Date(selectedVault.signatureTimestamp).toLocaleString(language === 'es' ? 'es-ES' : 'en-US')
                   : '';
+                const replayItems = [
+                  {
+                    id: 'origin',
+                    title: language === 'es' ? 'Origen del expediente' : 'Case origin',
+                    description: language === 'es'
+                      ? 'La evidencia fue encapsulada y se fijó su huella SHA3-256 para preservar identidad exacta.'
+                      : 'The evidence was encapsulated and its SHA3-256 fingerprint fixed to preserve exact identity.',
+                    stage: 'Stage 01',
+                    color: '#dbeafe',
+                    status: 'success' as const,
+                    glyph: '🧾',
+                  },
+                  {
+                    id: 'seal',
+                    title: language === 'es' ? 'Sellado híbrido' : 'Hybrid seal',
+                    description: language === 'es'
+                      ? `El contenedor recibió entropía híbrida y PQC desde ${selectedVault.manifest.quantumSource.target.replace('ionq.', '')}.`
+                      : `The container received hybrid entropy and PQC from ${selectedVault.manifest.quantumSource.target.replace('ionq.', '')}.`,
+                    stage: 'Stage 02',
+                    color: '#ede9fe',
+                    status: 'success' as const,
+                    glyph: '⚛️',
+                  },
+                  {
+                    id: 'ledger',
+                    title: language === 'es' ? 'Ledger de despacho' : 'Dispatch ledger',
+                    description: language === 'es'
+                      ? 'El envío quedó anclado en Stellar como prueba independiente de custodia.'
+                      : 'The dispatch was anchored on Stellar as independent custody proof.',
+                    stage: 'Stage 03',
+                    color: '#dcfce7',
+                    status: selectedVault.manifest.stellarNotarization ? 'success' : 'pending',
+                    glyph: '📜',
+                  },
+                  {
+                    id: 'receipt',
+                    title: language === 'es' ? 'Recepción del destinatario' : 'Recipient receipt',
+                    description: selectedVault.signatureStatus === 'signed'
+                      ? (language === 'es'
+                          ? 'El destinatario firmó el acuse y dejó estampa verificable de recepción.'
+                          : 'The recipient signed the receipt and left a verifiable proof of delivery.')
+                      : selectedVault.signatureStatus === 'pending'
+                        ? (language === 'es'
+                            ? 'La custodia sigue pendiente de firma por parte del destinatario autorizado.'
+                            : 'Custody remains pending signature from the authorized recipient.')
+                        : (language === 'es'
+                            ? 'La custodia fue entregada sin requisito de firma obligatoria.'
+                            : 'Custody was delivered without a mandatory signature requirement.'),
+                    stage: 'Final',
+                    color: '#fee2e2',
+                    status: selectedVault.signatureStatus === 'signed' ? 'success' : selectedVault.signatureStatus === 'pending' ? 'running' : 'success',
+                    glyph: '✍️',
+                  },
+                ];
 
                 return (
                   <div className="space-y-6 pt-2 animate-fadeIn text-left">
+                    <div className="glass-surface-soft rounded-[24px] p-3">
+                      <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500 block px-2 pt-1 mb-1">
+                        {language === 'es' ? 'Replay visual del expediente' : 'Case visual replay'}
+                      </span>
+                      <ProcessEventFeed items={replayItems} variant="compact" className="max-h-[300px]" />
+                    </div>
                     
                     {/* Visual Vertical Timeline */}
                     <div className="relative border-l-2 border-gray-100 ml-4 pl-6 space-y-7">
@@ -515,7 +578,7 @@ export const HistoryView: React.FC = () => {
                       {/* Step 1: Origin / Creation */}
                       <div className="relative">
                         {/* Dot */}
-                        <div className="absolute -left-[31px] top-0.5 bg-black text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                        <div className="absolute -left-[31px] top-0.5 bg-slate-950 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-[0_12px_22px_-16px_rgba(15,23,42,0.65)]">
                           <User size={10} />
                         </div>
                         <div className="space-y-1">
@@ -523,16 +586,16 @@ export const HistoryView: React.FC = () => {
                             <h4 className="text-xs font-bold text-gray-900 font-sans">
                               {language === 'es' ? '1. Creación del Sobre y Resguardo' : '1. Envelope Creation & Safeguard'}
                             </h4>
-                            <span className="text-[9px] bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-sm font-semibold uppercase">
-                              {language === 'es' ? 'COMPLETADO' : 'COMPLETED'}
+                            <span className="text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full font-semibold uppercase">
+                              {language === 'es' ? 'LISTO' : 'DONE'}
                             </span>
                           </div>
-                          <p className="text-[11px] text-gray-600 font-sans leading-relaxed">
+                            <p className="text-[11px] text-slate-600 font-sans leading-relaxed">
                             {language === 'es' 
-                              ? 'La evidencia original fue empaquetada dentro de un sobre digital hermético. Se calculó su huella digital única e inalterable SHA3-256 en su navegador.'
-                              : 'The original evidence was packed inside an airtight digital envelope. Its unique, unaltered SHA3-256 digital fingerprint was calculated in your browser.'}
+                                ? 'La evidencia original se encapsuló en un contenedor seguro y se calculó su huella única SHA3-256 en el navegador.'
+                                : 'The original evidence was encapsulated in a secure container and its unique SHA3-256 fingerprint was calculated in the browser.'}
                           </p>
-                          <div className="text-[10px] text-gray-400 font-mono flex items-center gap-3">
+                          <div className="text-[10px] text-slate-400 font-mono flex items-center gap-3">
                             <span>{dateString}</span>
                             <span className="truncate max-w-[200px]" title={selectedVault.manifest.payload.sha3Hash}>
                               Hash: {selectedVault.manifest.payload.sha3Hash.slice(0, 12)}...
@@ -544,7 +607,7 @@ export const HistoryView: React.FC = () => {
                       {/* Step 2: Quantum Sealing */}
                       <div className="relative">
                         {/* Dot */}
-                        <div className="absolute -left-[31px] top-0.5 bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                        <div className="absolute -left-[31px] top-0.5 bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-[0_12px_22px_-16px_rgba(79,70,229,0.65)]">
                           <Sparkles size={10} />
                         </div>
                         <div className="space-y-1">
@@ -552,16 +615,16 @@ export const HistoryView: React.FC = () => {
                             <h4 className="text-xs font-bold text-indigo-950 font-sans">
                               {language === 'es' ? '2. Sellado de Seguridad Física Cuántica' : '2. Quantum Physical Safety Seal'}
                             </h4>
-                            <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-sm font-semibold uppercase">
-                              {language === 'es' ? 'BLOQUEADO' : 'SECURED'}
+                            <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full font-semibold uppercase">
+                              {language === 'es' ? 'PROTEGIDO' : 'SECURED'}
                             </span>
                           </div>
-                          <p className="text-[11px] text-gray-600 font-sans leading-relaxed">
+                            <p className="text-[11px] text-slate-600 font-sans leading-relaxed">
                             {language === 'es' 
-                              ? `Se forjó un candado indescifrable mediante claves cuánticas de alta entropía procedentes del procesador de átomos suspendidos de IonQ (${selectedVault.manifest.quantumSource.target.replace('ionq.', '')}).`
-                              : `An unbreakable padlock was forged using high-entropy quantum keys from the IonQ suspended-atom processor (${selectedVault.manifest.quantumSource.target.replace('ionq.', '')}).`}
+                                ? `Se forjó un sello híbrido con alta entropía y PQC desde ${selectedVault.manifest.quantumSource.target.replace('ionq.', '')}.`
+                                : `A hybrid seal with high entropy and PQC was forged from ${selectedVault.manifest.quantumSource.target.replace('ionq.', '')}.`}
                           </p>
-                          <div className="text-[10px] text-gray-400 font-mono flex items-center gap-3">
+                          <div className="text-[10px] text-slate-400 font-mono flex items-center gap-3">
                             <span>{dateString}</span>
                             <span className="truncate max-w-[200px]" title={selectedVault.manifest.quantumSource.quantumSeed}>
                               Seed: {selectedVault.manifest.quantumSource.quantumSeed.slice(0, 12)}...
@@ -573,7 +636,7 @@ export const HistoryView: React.FC = () => {
                       {/* Step 3: Ledger Notarization */}
                       <div className="relative">
                         {/* Dot */}
-                        <div className="absolute -left-[31px] top-0.5 bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                        <div className="absolute -left-[31px] top-0.5 bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-[0_12px_22px_-16px_rgba(37,99,235,0.65)]">
                           <Globe size={10} />
                         </div>
                         <div className="space-y-1">
@@ -581,16 +644,16 @@ export const HistoryView: React.FC = () => {
                             <h4 className="text-xs font-bold text-blue-950 font-sans">
                               {language === 'es' ? '3. Acta de Entrega e Inmutabilidad Stellar' : '3. Immutable Record on Stellar'}
                             </h4>
-                            <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-sm font-semibold uppercase">
-                              {language === 'es' ? 'NOTARIZADO' : 'NOTARIZED'}
+                            <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full font-semibold uppercase">
+                              {language === 'es' ? 'REGISTRADO' : 'NOTARIZED'}
                             </span>
                           </div>
-                          <p className="text-[11px] text-gray-600 font-sans leading-relaxed">
+                            <p className="text-[11px] text-slate-600 font-sans leading-relaxed">
                             {language === 'es' 
-                              ? 'La marca de tiempo de despacho se grabó permanentemente en el libro público Stellar, sirviendo como un testigo imparcial independiente.'
-                              : 'The dispatch timestamp was permanently recorded in the public Stellar ledger, serving as an independent, impartial third-party witness.'}
+                                ? 'La marca de tiempo de despacho quedó registrada de forma inmutable en Stellar como prueba independiente de custodia.'
+                                : 'The dispatch timestamp was immutably registered on Stellar as an independent proof of custody.'}
                           </p>
-                          <div className="text-[10px] text-gray-400 font-mono flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <div className="text-[10px] text-slate-400 font-mono flex flex-wrap items-center gap-x-3 gap-y-1">
                             <span>{dateString}</span>
                             {selectedVault.manifest.stellarNotarization ? (
                               <div className="space-y-1">
@@ -625,11 +688,11 @@ export const HistoryView: React.FC = () => {
                             <UserCheck size={10} />
                           </div>
                         ) : selectedVault.signatureStatus === 'pending' ? (
-                          <div className="absolute -left-[31px] top-0.5 bg-amber-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                          <div className="absolute -left-[31px] top-0.5 bg-amber-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-[0_12px_22px_-16px_rgba(245,158,11,0.65)]">
                             <Clock size={10} className="animate-pulse" />
                           </div>
                         ) : (
-                          <div className="absolute -left-[31px] top-0.5 bg-gray-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-2xs">
+                          <div className="absolute -left-[31px] top-0.5 bg-slate-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-4 border-white shadow-[0_12px_22px_-16px_rgba(100,116,139,0.55)]">
                             <Check size={10} />
                           </div>
                         )}
@@ -641,30 +704,30 @@ export const HistoryView: React.FC = () => {
                             </h4>
                             
                             {selectedVault.signatureStatus === 'signed' && (
-                              <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-sm font-semibold uppercase">
+                              <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-semibold uppercase">
                                 {language === 'es' ? 'FIRMADO Y ENTREGADO' : 'SIGNED & DELIVERED'}
                               </span>
                             )}
                             {selectedVault.signatureStatus === 'pending' && (
-                              <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-sm font-semibold uppercase animate-pulse">
+                              <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-semibold uppercase animate-pulse">
                                 {language === 'es' ? 'ESPERANDO FIRMA DEL RECEPTOR' : 'WAITING FOR SIGNATURE'}
                               </span>
                             )}
                             {selectedVault.signatureStatus === 'not_required' && (
-                              <span className="text-[9px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-sm font-semibold uppercase">
+                              <span className="text-[9px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full font-semibold uppercase">
                                 {language === 'es' ? 'ENTREGA INMEDIATA ABIERTA' : 'OPEN IMMEDIATE DELIVERY'}
                               </span>
                             )}
                           </div>
 
                           {/* Recipient Profile Details */}
-                          <div className="bg-gray-50/70 border border-gray-100 rounded-sm p-3 space-y-1 text-xs">
+                          <div className="glass-surface-soft rounded-[20px] p-3 space-y-1 text-xs">
                             <div className="flex items-center gap-2">
-                              <User size={13} className="text-gray-400" />
-                              <span className="font-bold text-gray-800 font-sans">
+                              <User size={13} className="text-slate-400" />
+                              <span className="font-bold text-slate-800 font-sans">
                                 {recipientUser ? `${recipientUser.profile?.nombres} ${recipientUser.profile?.apellidos}` : (selectedVault.destinatario || selectedVault.recipientUsername || 'Externo / Desconocido')}
                               </span>
-                              <span className="text-[10px] text-gray-400 font-mono">
+                              <span className="text-[10px] text-slate-400 font-mono">
                                 (@{selectedVault.recipientUsername || selectedVault.destinatario || 'external'})
                               </span>
                             </div>
@@ -673,7 +736,7 @@ export const HistoryView: React.FC = () => {
                               <div className="text-[11px] text-gray-500 font-sans space-y-0.5 pl-5">
                                 <p>
                                   <span className="font-semibold">{language === 'es' ? 'Matrícula Profesional' : 'Professional License'}:</span>{' '}
-                                  <strong className="text-black font-semibold">{recipientUser.profile.matricula}</strong>
+                                  <strong className="text-slate-950 font-semibold">{recipientUser.profile.matricula}</strong>
                                 </p>
                                 <p>
                                   <span className="font-semibold">{language === 'es' ? 'Cargo y Fuero' : 'Position & Court'}:</span>{' '}
@@ -683,7 +746,7 @@ export const HistoryView: React.FC = () => {
                             )}
 
                             {!recipientUser && selectedVault.destinatario && (
-                              <p className="text-[10px] text-gray-400 italic pl-5">
+                              <p className="text-[10px] text-slate-400 italic pl-5">
                                 {language === 'es' ? 'Entrega dirigida a oficina externa o correo manual.' : 'Delivery directed to external office or manual email.'}
                               </p>
                             )}
@@ -707,7 +770,7 @@ export const HistoryView: React.FC = () => {
                           </p>
 
                           {selectedVault.signatureStatus === 'signed' && (
-                            <div className="text-[10px] text-emerald-700 font-mono flex flex-wrap items-center gap-x-3 gap-y-1 bg-emerald-50/50 p-2 rounded-sm border border-emerald-100/50">
+                            <div className="text-[10px] text-emerald-700 font-mono flex flex-wrap items-center gap-x-3 gap-y-1 bg-emerald-50/50 p-2 rounded-full border border-emerald-100/50">
                               <span className="flex items-center gap-1 font-bold">
                                 <Check size={11} className="stroke-[3]" />
                                 {language === 'es' ? 'RECIBIDO Y FIRMADO EL:' : 'RECEIVED & SIGNED ON:'} {sigDateString}
@@ -746,38 +809,38 @@ export const HistoryView: React.FC = () => {
               {inspectorTab === 'technical' && (
                 <div className="space-y-4 pt-2 animate-fadeIn">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
-                    <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
-                      <span className="text-[9px] font-mono uppercase text-gray-400 block font-semibold">
+                    <div className="glass-surface-soft rounded-[20px] p-3.5 space-y-1">
+                      <span className="text-[9px] font-mono uppercase text-slate-400 block font-semibold">
                         {language === 'es' ? 'DISPOSITIVO DE ENTROPÍA' : 'ENTROPY DEVICE'}
                       </span>
-                      <p className="text-xs font-semibold text-gray-900 truncate">
+                      <p className="text-xs font-semibold text-slate-950 truncate">
                         {selectedVault.manifest.quantumSource.provider}
                       </p>
-                      <p className="text-[10px] font-mono text-gray-400 truncate">
+                      <p className="text-[10px] font-mono text-slate-400 truncate">
                         Target: {selectedVault.manifest.quantumSource.target}
                       </p>
                     </div>
 
-                    <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
-                      <span className="text-[9px] font-mono uppercase text-gray-400 block font-semibold">
+                    <div className="glass-surface-soft rounded-[20px] p-3.5 space-y-1">
+                      <span className="text-[9px] font-mono uppercase text-slate-400 block font-semibold">
                         {language === 'es' ? 'ESTÁNDAR KEM SELECCIONADO' : 'SELECTED KEM STANDARD'}
                       </span>
-                      <p className="text-xs font-semibold text-gray-900 truncate">
+                      <p className="text-xs font-semibold text-slate-950 truncate">
                         {selectedVault.manifest.algorithm.kem}
                       </p>
-                      <p className="text-[10px] text-gray-400 font-mono">
+                      <p className="text-[10px] text-slate-400 font-mono">
                         {language === 'es' ? 'Parámetros: k=3, q=3329' : 'Parameters: k=3, q=3329'}
                       </p>
                     </div>
 
-                    <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
-                      <span className="text-[9px] font-mono uppercase text-gray-400 block font-semibold">
+                    <div className="glass-surface-soft rounded-[20px] p-3.5 space-y-1">
+                      <span className="text-[9px] font-mono uppercase text-slate-400 block font-semibold">
                         {language === 'es' ? 'HASH DE INTEGRIDAD PRE/POST' : 'PRE/POST INTEGRITY HASH'}
                       </span>
-                      <p className="text-xs font-mono font-semibold text-gray-900 truncate" title={selectedVault.manifest.payload.sha3Hash}>
+                      <p className="text-xs font-mono font-semibold text-slate-950 truncate" title={selectedVault.manifest.payload.sha3Hash}>
                         {selectedVault.manifest.payload.sha3Hash.slice(0, 16)}...
                       </p>
-                      <p className="text-[10px] text-gray-400 font-mono uppercase">
+                      <p className="text-[10px] text-slate-400 font-mono uppercase">
                         ALGORITMO: SHA3-256
                       </p>
                     </div>
@@ -786,11 +849,11 @@ export const HistoryView: React.FC = () => {
               )}
 
               {selectedVault.notes && (
-                <div className="bg-gray-50 border border-l-2 border-l-black border-[#eaeaea] p-3.5 rounded-sm text-left">
-                  <span className="text-[9px] font-mono uppercase text-gray-400 block font-semibold mb-1">
+                <div className="glass-surface-soft border-l-2 border-l-slate-950 p-3.5 rounded-[20px] text-left">
+                  <span className="text-[9px] font-mono uppercase text-slate-400 block font-semibold mb-1">
                     {language === 'es' ? 'Notas de Custodia / Bitácora' : 'Custody Notes / Log'}
                   </span>
-                  <p className="text-xs text-gray-700 italic font-sans leading-relaxed">
+                  <p className="text-xs text-slate-700 italic font-sans leading-relaxed">
                     "{selectedVault.notes}"
                   </p>
                 </div>
@@ -800,10 +863,10 @@ export const HistoryView: React.FC = () => {
               <div className="border-t border-[#eaeaea] pt-6 space-y-4 text-left">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h4 className="font-sans font-bold text-xs text-gray-900 uppercase tracking-widest">
+                    <h4 className="font-sans font-bold text-xs text-slate-950 uppercase tracking-widest">
                       {language === 'es' ? 'Descapsulado Cuántico de Datos' : 'Quantum Data Decapsulation'}
                     </h4>
-                    <p className="text-[11px] text-gray-400 max-w-sm mt-0.5">
+                    <p className="text-[11px] text-slate-400 max-w-sm mt-0.5">
                       {language === 'es' 
                         ? 'Recupere la llave compartida Kyber para desencapsular y verificar la integridad original de este sobre en el cliente.' 
                         : 'Retrieve the Kyber shared secret to decapsulate and verify the original integrity of this envelope client-side.'}
@@ -813,7 +876,7 @@ export const HistoryView: React.FC = () => {
                   <button
                     onClick={() => handleUnseal(selectedVault)}
                     disabled={isDecrypting}
-                    className="flex items-center gap-2 bg-[#000000] text-white px-5 py-3 rounded-sm text-xs font-sans font-semibold hover:bg-opacity-90 transition-all cursor-pointer disabled:opacity-50"
+                    className="glass-button-primary flex items-center gap-2 text-white px-5 py-3 rounded-[18px] text-xs font-sans font-semibold cursor-pointer disabled:opacity-50"
                     id="unseal-action-btn"
                   >
                     {isDecrypting ? (

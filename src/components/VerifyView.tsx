@@ -24,6 +24,8 @@ import {
   Shield
 } from 'lucide-react';
 
+const surfaceCard = 'bg-white/90 backdrop-blur-xl border border-slate-200/80 rounded-[28px] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.45)]';
+
 const sha3_256 = (
   sha3Module.sha3_256 || 
   (sha3Module as any).default?.sha3_256 || 
@@ -374,35 +376,35 @@ export const VerifyView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#eaeaea] pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div>
-          <h1 className="font-sans font-semibold tracking-tight text-2xl text-[#111111]" id="verifier-title">
+          <h1 className="font-display font-semibold tracking-tight text-3xl text-slate-950" id="verifier-title">
             {t.verifyTitle}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-slate-500 mt-1 max-w-2xl">
             {t.verifySub}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[11px] font-mono bg-gray-50 text-gray-600 px-3 py-1.5 rounded-sm border border-[#eaeaea]">
-          <Globe size={13} className="text-gray-400" />
+        <div className="inline-flex items-center gap-2 text-[11px] font-mono bg-white/80 text-slate-600 px-4 py-2 rounded-full border border-slate-200 shadow-sm">
+          <Globe size={13} className="text-slate-400" />
           <span>
             {language === 'es' ? 'RED ESTÁNDAR: ' : 'STANDARD NETWORK: '}
-            <strong className="text-black font-semibold uppercase">
+            <strong className="text-slate-950 font-semibold uppercase">
               {settings.stellarNetwork === 'public' ? 'STELLAR MAINNET' : 'STELLAR TESTNET'}
             </strong>
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Drag/Drop and Actions */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="bg-white border border-[#eaeaea] rounded-sm p-6 space-y-5">
-            <div className="flex items-center gap-2 pb-3 border-b border-[#fafafa]">
-              <FileSearch size={15} className="text-black" />
-              <h2 className="font-sans font-bold text-xs text-[#111111] uppercase tracking-wider">
+          <div className={surfaceCard + ' p-6 space-y-5'}>
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-200/70">
+              <FileSearch size={15} className="text-slate-950" />
+              <h2 className="font-sans font-bold text-xs text-slate-950 uppercase tracking-[0.24em]">
                 {language === 'es' ? 'Auditoría Forense de Archivos' : 'Forensic File Audit'}
               </h2>
             </div>
@@ -413,21 +415,21 @@ export const VerifyView: React.FC = () => {
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className={`border border-dashed rounded-sm p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 bg-[#fafafa] min-h-[220px] ${
+                className={`border border-dashed rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 bg-slate-50 min-h-[220px] ${
                   isDragOver 
-                    ? 'border-black bg-gray-50' 
-                    : 'border-[#eaeaea] hover:border-gray-400 hover:bg-gray-50'
+                    ? 'border-slate-950 bg-white' 
+                    : 'border-slate-200 hover:border-slate-400 hover:bg-white'
                 }`}
                 id="verify-drag-drop"
               >
-                <Upload size={24} className="text-gray-400 mb-2.5" />
-                <p className="text-xs font-sans text-gray-700 font-semibold">
+                <Upload size={24} className="text-slate-400 mb-2.5" />
+                <p className="text-xs font-sans text-slate-700 font-semibold">
                   {t.dragVerifyText}
                 </p>
-                <p className="text-[11px] text-gray-400 mt-1">
-                  {language === 'es' ? 'o haga clic para ' : 'or click to '}<span className="font-bold text-black underline">{language === 'es' ? 'examinar su disco' : 'browse disk'}</span>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {language === 'es' ? 'o haga clic para ' : 'or click to '}<span className="font-bold text-slate-950 underline">{language === 'es' ? 'examinar su disco' : 'browse disk'}</span>
                 </p>
-                <p className="text-[10px] text-gray-400 mt-2 max-w-[200px] leading-relaxed">
+                <p className="text-[10px] text-slate-400 mt-2 max-w-[200px] leading-relaxed">
                   {t.verifySubText}
                 </p>
                 <input
@@ -440,14 +442,14 @@ export const VerifyView: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-gray-50 border border-[#eaeaea] rounded-sm" id="verify-selected-card">
+                <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-2xl" id="verify-selected-card">
                   <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="p-2.5 bg-white rounded-sm border border-[#eaeaea] text-black flex-shrink-0">
+                    <div className="p-2.5 bg-white rounded-2xl border border-slate-200 text-slate-950 flex-shrink-0">
                       <FileText size={18} />
                     </div>
                     <div className="overflow-hidden text-left">
-                      <p className="text-xs font-semibold text-gray-900 truncate">{selectedFile.name}</p>
-                      <p className="text-[10px] text-gray-400 font-mono">
+                      <p className="text-xs font-semibold text-slate-950 truncate">{selectedFile.name}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">
                         {(selectedFile.size / 1024).toFixed(1)} KB
                       </p>
                     </div>
@@ -458,14 +460,14 @@ export const VerifyView: React.FC = () => {
                   <button
                     onClick={resetVerifier}
                     disabled={isVerifying}
-                    className="flex-1 border border-[#eaeaea] text-gray-600 hover:bg-gray-50 hover:text-black py-2.5 rounded-sm text-xs font-sans font-semibold transition-colors disabled:opacity-50"
+                    className="flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-950 py-2.5 rounded-2xl text-xs font-sans font-semibold transition-colors disabled:opacity-50"
                   >
                     {language === 'es' ? 'Cambiar Archivo' : 'Change File'}
                   </button>
                   <button
                     onClick={handleVerify}
                     disabled={isVerifying}
-                    className="flex-1 bg-black text-white hover:bg-opacity-90 py-2.5 rounded-sm text-xs font-sans font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="flex-1 bg-slate-950 text-white hover:bg-slate-900 py-2.5 rounded-2xl text-xs font-sans font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {isVerifying ? (
                       <>
@@ -488,12 +490,12 @@ export const VerifyView: React.FC = () => {
         {/* Right Column: Verification Results */}
         <div className="lg:col-span-7">
           {result ? (
-            <div className="bg-white border border-[#eaeaea] rounded-sm p-6 md:p-8 space-y-6 text-left animate-fade-in" id="verification-result-panel">
+            <div className={surfaceCard + ' p-6 md:p-8 space-y-6 text-left animate-fade-in'} id="verification-result-panel">
               
               {/* Veredict Alert */}
               {result.isValid && !result.isModified ? (
                 /* SUCCESSFUL VERIFICATION */
-                <div className="bg-emerald-50 border border-emerald-200 rounded-sm p-5 space-y-3">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-3">
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="text-emerald-600 flex-shrink-0 mt-0.5" size={20} />
                     <div>
@@ -510,7 +512,7 @@ export const VerifyView: React.FC = () => {
                 </div>
               ) : result.isModified ? (
                 /* ALTERED DOCUMENT WARNING */
-                <div className="bg-red-50 border border-red-200 rounded-sm p-5 space-y-3">
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-5 space-y-3">
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
                     <div>
@@ -525,7 +527,7 @@ export const VerifyView: React.FC = () => {
                 </div>
               ) : (
                 /* NO SIGNATURE FOUND */
-                <div className="bg-amber-50 border border-amber-200 rounded-sm p-5 space-y-3">
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
                     <div>
@@ -542,25 +544,25 @@ export const VerifyView: React.FC = () => {
 
               {/* Technical Audit Log Table */}
               <div className="space-y-4">
-                <h4 className="font-sans font-bold text-xs text-[#111111] uppercase tracking-wider border-b border-gray-100 pb-2">
+                  <h4 className="font-sans font-bold text-xs text-slate-950 uppercase tracking-[0.24em] border-b border-slate-200 pb-2">
                   {language === 'es' ? 'Detalle del Sello Forense' : 'Forensic Seal Details'}
                 </h4>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
-                    <span className="text-[9px] font-mono text-gray-400 font-bold block uppercase">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-1">
+                    <span className="text-[9px] font-mono text-slate-400 font-bold block uppercase">
                       {t.auditedFile}
                     </span>
-                    <p className="text-xs font-semibold text-gray-900 truncate">
+                      <p className="text-xs font-semibold text-slate-950 truncate">
                       {result.filename}
                     </p>
-                    <p className="text-[10px] font-mono text-gray-400">
+                      <p className="text-[10px] font-mono text-slate-400">
                       {(result.filesize / 1024).toFixed(1)} KB • {language === 'es' ? 'Formato' : 'Format'}: {result.format === 'none' ? (language === 'es' ? 'Sin firma' : 'Unsigned') : result.format.toUpperCase()}
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1">
-                    <span className="text-[9px] font-mono text-gray-400 font-bold block uppercase">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-1">
+                    <span className="text-[9px] font-mono text-slate-400 font-bold block uppercase">
                       {t.stellarLedgerTx}
                     </span>
                     {result.stellarTx ? (
@@ -569,7 +571,7 @@ export const VerifyView: React.FC = () => {
                           {result.stellarTx.slice(0, 18)}...
                         </p>
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono text-gray-400">
+                          <span className="text-[10px] font-mono text-slate-400">
                             Ledger: #{result.ledgerNumber}
                           </span>
                           <a
@@ -590,27 +592,27 @@ export const VerifyView: React.FC = () => {
                         )}
                       </div>
                     ) : (
-                      <p className="text-xs font-semibold text-gray-400 italic">
+                      <p className="text-xs font-semibold text-slate-400 italic">
                         {t.notNotarized}
                       </p>
                     )}
                   </div>
 
-                  <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1 md:col-span-2">
-                    <span className="text-[9px] font-mono text-gray-400 font-bold block uppercase">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-1 md:col-span-2">
+                    <span className="text-[9px] font-mono text-slate-400 font-bold block uppercase">
                       {t.currentHash}
                     </span>
-                    <p className="text-xs font-mono font-semibold text-gray-800 break-all select-all">
+                      <p className="text-xs font-mono font-semibold text-slate-800 break-all select-all">
                       {result.currentHash}
                     </p>
                   </div>
 
                   {result.originalHash && (
-                    <div className="bg-gray-50 border border-[#eaeaea] rounded-sm p-3.5 space-y-1 md:col-span-2">
-                      <span className="text-[9px] font-mono text-gray-400 font-bold block uppercase">
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-1 md:col-span-2">
+                      <span className="text-[9px] font-mono text-slate-400 font-bold block uppercase">
                         {t.originalHash}
                       </span>
-                      <p className="text-xs font-mono font-semibold text-gray-800 break-all">
+                      <p className="text-xs font-mono font-semibold text-slate-800 break-all">
                         {result.originalHash}
                       </p>
                       <p className="text-[9px] text-gray-400 font-sans">
@@ -849,7 +851,7 @@ export const VerifyView: React.FC = () => {
                 const rows = lines.map(line => line.split(','));
                 
                 return (
-                  <div className="overflow-auto max-h-[550px] scrollbar-thin">
+                  <div className="overflow-auto hide-scrollbar max-h-[550px]">
                     <table className="w-full text-xs text-left border-collapse border border-slate-800 bg-slate-950">
                       <thead>
                         <tr className="bg-slate-900 text-slate-300 font-mono text-[10px] uppercase border-b border-slate-800">
@@ -889,7 +891,7 @@ export const VerifyView: React.FC = () => {
               }
               
               return (
-                <div className="bg-slate-950 p-5 rounded-sm border border-slate-900 font-mono text-xs text-slate-300 overflow-auto max-h-[500px] leading-relaxed whitespace-pre-wrap select-text">
+                <div className="bg-slate-950 p-5 rounded-sm border border-slate-900 font-mono text-xs text-slate-300 overflow-auto hide-scrollbar max-h-[500px] leading-relaxed whitespace-pre-wrap select-text">
                   {text}
                 </div>
               );

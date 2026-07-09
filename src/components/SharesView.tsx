@@ -240,15 +240,25 @@ export const SharesView: React.FC = () => {
 
     let decrypted = '';
     try {
-      // Intelligently detect if encryptedData is a real AES-GCM Hex payload
-      const isHex = /^[0-9a-fA-F]+$/.test(encryptedData);
-      if (isHex && share.aesKeyHex && share.iv) {
+      // Detect real AES-GCM payloads stored as hex or typed base64
+      const isEncryptedPayload = /^[0-9a-fA-F]+$/.test(encryptedData) || encryptedData.startsWith('b64:');
+      if (isEncryptedPayload && share.aesKeyHex && share.iv) {
         const hexToBytes = (hex: string): Uint8Array => {
           const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
           const sanitized = cleanHex.trim().replace(/[^0-9a-fA-F]/g, '');
           const bytes = new Uint8Array(sanitized.length / 2);
           for (let i = 0; i < bytes.length; i++) {
             bytes[i] = parseInt(sanitized.slice(i * 2, i * 2 + 2), 16);
+          }
+          return bytes;
+        };
+
+        const base64ToBytes = (base64: string): Uint8Array => {
+          const normalized = base64.startsWith('b64:') ? base64.slice(4) : base64;
+          const binary = atob(normalized);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
           }
           return bytes;
         };
@@ -262,7 +272,7 @@ export const SharesView: React.FC = () => {
           ['decrypt']
         );
         const ivBytes = hexToBytes(share.iv);
-        const encryptedBytes = hexToBytes(encryptedData);
+        const encryptedBytes = encryptedData.startsWith('b64:') ? base64ToBytes(encryptedData) : hexToBytes(encryptedData);
         
         const decryptedBuffer = await window.crypto.subtle.decrypt(
           {
@@ -308,7 +318,8 @@ export const SharesView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 text-left animate-fade-in" id="shares-view-root">
+    <div className="space-y-8 text-left animate-fade-in relative overflow-hidden" id="shares-view-root">
+    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.10),transparent_26%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.05),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.55),rgba(238,242,247,0.95))]" />
       {/* Title Header */}
       <div>
         <h2 className="font-sans font-bold text-xs text-[#111111] uppercase tracking-widest flex items-center gap-2">
@@ -322,8 +333,8 @@ export const SharesView: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Generator Form */}
-        <div className="lg:col-span-1 bg-white border border-[#eaeaea] p-6 rounded-sm shadow-xs space-y-4">
-          <h3 className="font-sans font-bold text-[10px] text-gray-900 uppercase tracking-widest pb-3 border-b border-[#fafafa] flex items-center gap-1.5">
+        <div className="lg:col-span-1 glass-surface p-6 rounded-[28px] space-y-4">
+          <h3 className="font-sans font-bold text-[10px] text-slate-950 uppercase tracking-widest pb-3 border-b border-white/70 flex items-center gap-1.5">
             <Lock size={13} />
             {t.createShareLink}
           </h3>
@@ -339,7 +350,7 @@ export const SharesView: React.FC = () => {
                 value={filename}
                 onChange={(e) => setFilename(e.target.value)}
                 placeholder="evidencia_pericial.pdf"
-                className="w-full text-xs font-mono px-3.5 py-2.5 rounded-sm border border-[#eaeaea] bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white transition-all"
+                className="w-full text-xs font-mono px-3.5 py-2.5 glass-input"
               />
             </div>
 
@@ -353,14 +364,14 @@ export const SharesView: React.FC = () => {
                 onChange={(e) => setPlainText(e.target.value)}
                 placeholder={language === 'es' ? "Ingrese los textos judiciales que serán cifrados..." : "Enter the judicial texts to be encrypted..."}
                 rows={5}
-                className="w-full text-xs font-sans p-3.5 rounded-sm border border-[#eaeaea] bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white transition-all leading-normal"
+                className="w-full text-xs font-sans p-3.5 glass-input leading-normal"
               />
             </div>
 
             <button
               type="submit"
               disabled={isGenerating || !filename || !plainText}
-              className="w-full flex items-center justify-center gap-2 bg-black text-white px-5 py-3 rounded-sm text-xs font-sans font-semibold hover:bg-opacity-90 transition-all cursor-pointer disabled:opacity-50 uppercase tracking-widest"
+              className="glass-button-primary w-full px-5 py-3 text-xs font-semibold uppercase tracking-[0.22em] disabled:opacity-50"
             >
               {isGenerating ? (
                 <>
@@ -379,8 +390,8 @@ export const SharesView: React.FC = () => {
 
         {/* Shares Monitor & Simulation Panel */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white border border-[#eaeaea] p-6 rounded-sm shadow-xs space-y-4">
-            <h3 className="font-sans font-bold text-[10px] text-gray-900 uppercase tracking-widest pb-3 border-b border-[#fafafa]">
+          <div className="glass-surface p-6 rounded-[28px] space-y-4">
+            <h3 className="font-sans font-bold text-[10px] text-slate-950 uppercase tracking-widest pb-3 border-b border-white/70">
               {t.shareHistory} ({ephemeralShares.length})
             </h3>
 
@@ -393,7 +404,7 @@ export const SharesView: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1">
+              <div className="space-y-4 max-h-[450px] overflow-y-auto hide-scrollbar pr-1">
                 {ephemeralShares.map((share) => {
                   const shareUrl = `https://viewq.vibedesk.dev/share/${share.token}#${share.aesKeyHex}`;
                   const isCopied = copiedToken === share.token;
@@ -401,7 +412,7 @@ export const SharesView: React.FC = () => {
                   return (
                     <div 
                       key={share.token}
-                      className="border border-[#eaeaea] bg-[#fafafa] p-4 rounded-sm flex flex-col gap-3"
+                      className="glass-surface-soft p-4 rounded-[22px] flex flex-col gap-3"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                         <div className="text-left space-y-2 flex-1 min-w-0">
@@ -429,7 +440,7 @@ export const SharesView: React.FC = () => {
                             <div className="flex gap-2 flex-wrap">
                               <button
                                 onClick={() => copyToClipboard(shareUrl, share.token)}
-                                className="flex items-center gap-1.5 bg-white border border-[#eaeaea] text-gray-700 hover:text-black hover:border-gray-400 px-3 py-1.5 rounded-sm text-[10px] font-sans font-bold transition-all cursor-pointer"
+                                className="glass-button-secondary px-3 py-1.5 text-[10px] font-semibold"
                                 title={language === 'es' ? "Copiar Enlace al portapapeles" : "Copy Link to clipboard"}
                               >
                                 {isCopied ? <Check size={12} className="text-green-600" /> : <Copy size={12} />}
@@ -438,7 +449,7 @@ export const SharesView: React.FC = () => {
                               
                               <button
                                 onClick={() => handleShareMobile(share)}
-                                className="flex items-center gap-1.5 bg-white border border-[#eaeaea] text-gray-700 hover:text-black hover:border-gray-400 px-3 py-1.5 rounded-sm text-[10px] font-sans font-bold transition-all cursor-pointer"
+                                className="glass-button-secondary px-3 py-1.5 text-[10px] font-semibold"
                                 title={language === 'es' ? "Compartir enlace" : "Share link"}
                               >
                                 <Share2 size={12} className="text-gray-500" />
@@ -451,7 +462,7 @@ export const SharesView: React.FC = () => {
                         <div className="flex items-center gap-2 self-end sm:self-start flex-shrink-0">
                           <button
                             onClick={() => startReceptorSimulation(share)}
-                            className="flex items-center gap-1.5 bg-black text-white hover:bg-zinc-900 px-3 py-1.5 rounded-sm text-[10px] font-sans font-bold transition-all cursor-pointer animate-pulse"
+                            className="glass-button-primary px-3 py-1.5 text-[10px] font-semibold animate-pulse"
                             title={language === 'es' ? "Iniciar apertura por receptor" : "Open recipient viewer"}
                           >
                             <Eye size={12} />
@@ -459,7 +470,7 @@ export const SharesView: React.FC = () => {
                           </button>
                           <button
                             onClick={() => deleteEphemeralShare(share.token)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 border border-transparent hover:border-[#eaeaea] rounded-sm bg-white"
+                            className="glass-button-secondary p-1.5 text-gray-400 hover:text-red-600 border-transparent hover:border-white/70 bg-white/70"
                             title={language === 'es' ? "Eliminar enlace de la bitácora" : "Delete link from log"}
                           >
                             <Trash2 size={13} />
@@ -469,7 +480,7 @@ export const SharesView: React.FC = () => {
 
                       {/* Easily show device, OS, location, IP, and timestamp if consumed */}
                       {share.consumed && share.consumedBy && (
-                        <div className="bg-white border border-[#eaeaea] p-4 rounded-sm space-y-3 text-left">
+                        <div className="glass-surface-soft p-4 rounded-[22px] space-y-3 text-left">
                           <div className="flex items-center gap-1.5 border-b border-[#fafafa] pb-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block animate-pulse" />
                             <span className="text-[9px] font-mono font-bold text-gray-900 uppercase tracking-wide">
@@ -574,7 +585,7 @@ export const SharesView: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Simulated logs terminal in white/gray executive style */}
-                <div className="bg-[#fafafa] border border-[#eaeaea] p-4 rounded-sm h-[200px] overflow-y-auto font-mono text-[10px] text-gray-700 space-y-1.5 text-left">
+                <div className="bg-[#fafafa] border border-[#eaeaea] p-4 rounded-sm h-[200px] overflow-y-auto hide-scrollbar font-mono text-[10px] text-gray-700 space-y-1.5 text-left">
                   <span className="text-[9px] text-[#444444] block border-b border-[#eaeaea] pb-1.5 mb-1.5 font-bold uppercase tracking-wider">
                     {language === 'es' ? 'CONSOLA FORENSE DE APERTURA SILENCIOSA' : 'SILENT OPENING FORENSIC CONSOLE'}
                   </span>

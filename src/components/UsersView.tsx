@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp, handleFirestoreError, OperationType } from '../context/AppContext';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -32,6 +32,7 @@ export const UsersView: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
 
   const t = {
     es: {
@@ -167,11 +168,24 @@ export const UsersView: React.FC = () => {
     rejected: auditUsersList.filter(u => u.status === 'rejected').length,
   };
 
+  useEffect(() => {
+    if (filteredUsers.length === 0) {
+      setSelectedUsername(null);
+      return;
+    }
+
+    if (!selectedUsername || !filteredUsers.some(user => user.username === selectedUsername)) {
+      setSelectedUsername(filteredUsers[0].username);
+    }
+  }, [filteredUsers, selectedUsername]);
+
+  const selectedUser = filteredUsers.find(user => user.username === selectedUsername) || null;
+
   return (
     <div className="space-y-6" id="users-view-root">
       
       {/* Disclaimer Alert */}
-      <div className="bg-emerald-50 border border-emerald-150 p-4 rounded-sm flex items-start gap-3 text-emerald-950 text-xs">
+      <div className="glass-surface-soft border border-emerald-100 p-4 rounded-[24px] flex items-start gap-3 text-emerald-950 text-xs">
         <ShieldCheck className="text-emerald-700 mt-0.5 flex-shrink-0 animate-pulse" size={16} />
         <div>
           <span className="font-bold block text-[10px] font-mono tracking-wider text-emerald-800 uppercase mb-1">
@@ -184,13 +198,13 @@ export const UsersView: React.FC = () => {
       </div>
 
       {/* Header Block with Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#eaeaea] pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/70 pb-6">
         <div>
-          <h1 className="font-sans font-bold text-2xl text-gray-900 tracking-tight flex items-center gap-2">
-            <Users size={22} className="text-gray-900" />
+          <h1 className="font-sans font-bold text-2xl text-slate-950 tracking-tight flex items-center gap-2">
+            <Users size={22} className="text-slate-950" />
             {t.title}
           </h1>
-          <p className="text-xs text-gray-500 font-sans mt-1 max-w-2xl leading-relaxed">
+          <p className="text-xs text-slate-500 font-sans mt-1 max-w-2xl leading-relaxed">
             {t.subtitle}
           </p>
         </div>
@@ -198,7 +212,7 @@ export const UsersView: React.FC = () => {
         {/* Simulate sign-up button for quick testing */}
         <button
           onClick={handleCreateMockUser}
-          className="self-start md:self-center bg-black hover:bg-zinc-800 text-white text-[11px] font-mono px-4 py-2.5 rounded-sm cursor-pointer transition-all flex items-center gap-1.5 font-semibold shadow-xs"
+          className="self-start md:self-center glass-button-primary text-white text-[11px] font-mono px-4 py-2.5 rounded-[18px] cursor-pointer transition-all flex items-center gap-1.5 font-semibold"
           title="Simulate user registration"
         >
           <PlusCircle size={14} />
@@ -208,28 +222,28 @@ export const UsersView: React.FC = () => {
 
       {/* Statistics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" id="users-stats-grid">
-        <div className="bg-[#fafafa] border border-[#eaeaea] p-4 rounded-sm">
-          <span className="text-[10px] font-mono text-gray-400 block uppercase font-bold tracking-wider">
+        <div className="glass-surface-soft p-4 rounded-[24px]">
+          <span className="text-[10px] font-mono text-slate-400 block uppercase font-bold tracking-wider">
             {t.statsTotal}
           </span>
-          <span className="text-2xl font-mono font-bold text-gray-900">{stats.total}</span>
+          <span className="text-2xl font-mono font-bold text-slate-950">{stats.total}</span>
         </div>
         
-        <div className="bg-[#fafafa] border border-[#eaeaea] p-4 rounded-sm border-l-2 border-l-amber-500">
+        <div className="glass-surface-soft p-4 rounded-[24px] border-l-2 border-l-amber-500">
           <span className="text-[10px] font-mono text-amber-600 block uppercase font-bold tracking-wider flex items-center gap-1">
             <Clock size={11} /> {t.statsPending}
           </span>
           <span className="text-2xl font-mono font-bold text-amber-700">{stats.pending}</span>
         </div>
 
-        <div className="bg-[#fafafa] border border-[#eaeaea] p-4 rounded-sm border-l-2 border-l-emerald-600">
+        <div className="glass-surface-soft p-4 rounded-[24px] border-l-2 border-l-emerald-600">
           <span className="text-[10px] font-mono text-emerald-600 block uppercase font-bold tracking-wider flex items-center gap-1">
             <Check size={11} /> {t.statsApproved}
           </span>
           <span className="text-2xl font-mono font-bold text-emerald-700">{stats.approved}</span>
         </div>
 
-        <div className="bg-[#fafafa] border border-[#eaeaea] p-4 rounded-sm border-l-2 border-l-red-600">
+        <div className="glass-surface-soft p-4 rounded-[24px] border-l-2 border-l-red-600">
           <span className="text-[10px] font-mono text-red-600 block uppercase font-bold tracking-wider flex items-center gap-1">
             <X size={11} /> {t.statsRejected}
           </span>
@@ -238,29 +252,29 @@ export const UsersView: React.FC = () => {
       </div>
 
       {/* Filters & Search Block */}
-      <div className="flex flex-col sm:flex-row gap-3 bg-white border border-[#eaeaea] p-3 rounded-sm">
+      <div className="flex flex-col sm:flex-row gap-3 glass-surface-soft p-3 rounded-[24px]">
         {/* Search Input */}
         <div className="relative flex-1 flex items-center">
-          <Search className="absolute left-3 text-gray-400" size={14} />
+          <Search className="absolute left-3 text-slate-400" size={14} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t.searchPlaceholder}
-            className="w-full text-xs font-sans pl-9 pr-4 py-2 border border-[#eaeaea] rounded-sm bg-[#fafafa] text-[#111111] focus:outline-none focus:border-black focus:bg-white transition-all"
+            className="glass-input w-full text-xs font-sans pl-9 pr-4 py-2 rounded-[18px]"
           />
         </div>
 
         {/* Tab Filters */}
-        <div className="flex bg-gray-100 p-0.5 rounded-sm border border-[#eaeaea] self-start sm:self-auto">
+        <div className="flex glass-surface-soft p-0.5 rounded-[18px] border border-white/70 self-start sm:self-auto">
           {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
-              className={`px-3 py-1.5 text-[10px] font-sans font-bold uppercase rounded-xs transition-all cursor-pointer ${
+              className={`px-3 py-1.5 text-[10px] font-sans font-bold uppercase rounded-[14px] transition-all cursor-pointer ${
                 filterStatus === status 
-                  ? 'bg-white text-black shadow-xs' 
-                  : 'text-gray-400 hover:text-gray-600'
+                  ? 'bg-white text-slate-950 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.45)]' 
+                  : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               {status === 'all' && t.all}
@@ -274,159 +288,251 @@ export const UsersView: React.FC = () => {
 
       {/* Users list / grid */}
       {filteredUsers.length === 0 ? (
-        <div className="bg-white border border-[#eaeaea] rounded-sm py-16 px-6 text-center max-w-xl mx-auto">
-          <div className="w-12 h-12 bg-gray-50 border border-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+        <div className="glass-surface rounded-[28px] py-16 px-6 text-center max-w-xl mx-auto">
+          <div className="w-12 h-12 glass-surface-soft rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
             <Users size={20} />
           </div>
-          <h3 className="font-sans font-bold text-sm text-gray-900 uppercase tracking-wider">
+          <h3 className="font-sans font-bold text-sm text-slate-950 uppercase tracking-wider">
             {stats.total === 0 ? t.noUsersGeneral : t.noUsers}
           </h3>
-          <p className="text-xs text-gray-400 font-sans mt-2 leading-relaxed">
+          <p className="text-xs text-slate-400 font-sans mt-2 leading-relaxed">
             {stats.total === 0 ? t.noUsersDesc : ''}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="users-review-grid">
-          {filteredUsers.map((item) => {
-            const hasProfile = !!item.profile;
-            return (
-              <div 
-                key={item.username} 
-                className={`bg-white border rounded-sm p-6 flex flex-col justify-between transition-all relative ${
-                  item.status === 'pending' ? 'border-amber-200 ring-2 ring-amber-500/5' : 
-                  item.status === 'approved' ? 'border-emerald-200' : 'border-red-200 opacity-80'
-                }`}
-              >
-                
-                {/* Header info card */}
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono font-bold text-xs text-black uppercase tracking-wide truncate">
-                          {item.username}
-                        </span>
-                        
-                        {/* Status badges */}
-                        {item.status === 'pending' && (
-                          <span className="bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-sm text-[8px] font-mono uppercase tracking-wide font-bold">
-                            {t.pending.toUpperCase()}
+        <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6 items-start" id="users-review-grid">
+          <div className="glass-surface rounded-[28px] overflow-hidden">
+            <div className="px-5 py-4 border-b border-white/70 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-sans font-bold text-slate-950 uppercase tracking-wider">
+                  {language === 'es' ? 'Lista de usuarios' : 'User list'}
+                </h2>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {language === 'es'
+                    ? 'Seleccione una fila para abrir el detalle y ejecutar una acción.'
+                    : 'Select a row to open the detail panel and act on the user.'}
+                </p>
+              </div>
+              <span className="glass-badge px-2.5 py-1 text-[10px] font-mono text-slate-500 uppercase tracking-wider">
+                {filteredUsers.length}
+              </span>
+            </div>
+
+            <div className="divide-y divide-white/70">
+              {filteredUsers.map((item) => {
+                const statusLabel = item.status === 'pending' ? t.pending : item.status === 'approved' ? t.approved : t.rejected;
+                const isActive = selectedUser?.username === item.username;
+
+                return (
+                  <button
+                    key={item.username}
+                    onClick={() => setSelectedUsername(item.username)}
+                    className={`w-full text-left px-5 py-4 transition-all cursor-pointer hover:bg-white/70 ${
+                      isActive ? 'bg-white/80' : 'bg-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-xs text-slate-950 uppercase tracking-wide truncate">
+                            {item.username}
                           </span>
-                        )}
-                        {item.status === 'approved' && (
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-sm text-[8px] font-mono uppercase tracking-wide font-bold">
-                            {t.approved.toUpperCase()}
+                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-mono uppercase tracking-wide font-bold border ${
+                            item.status === 'pending'
+                              ? 'bg-amber-50 text-amber-700 border-amber-100'
+                              : item.status === 'approved'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                : 'bg-red-50 text-red-700 border-red-100'
+                          }`}>
+                            {statusLabel}
                           </span>
-                        )}
-                        {item.status === 'rejected' && (
-                          <span className="bg-red-50 text-red-700 border border-red-100 px-2 py-0.5 rounded-sm text-[8px] font-mono uppercase tracking-wide font-bold">
-                            {t.rejected.toUpperCase()}
-                          </span>
-                        )}
+                          {isActive && (
+                            <span className="text-[8px] font-mono uppercase tracking-[0.22em] text-slate-400">{language === 'es' ? 'Seleccionado' : 'Selected'}</span>
+                          )}
+                        </div>
+
+                        <div className="mt-1.5 flex items-center gap-3 text-[10px] text-slate-500 font-mono flex-wrap">
+                          <span>{t.authType} <strong className="text-slate-700 uppercase">{item.authType}</strong></span>
+                          <span>•</span>
+                          <span>{t.registeredAt} <strong className="text-slate-700">{new Date(item.registeredAt).toLocaleDateString()}</strong></span>
+                          <span>•</span>
+                          <span className="truncate max-w-[180px]">{item.profile?.jurisdiccion || (language === 'es' ? 'Sin perfil profesional' : 'No professional profile')}</span>
+                        </div>
                       </div>
-                      
-                      <div className="flex items-center gap-3 text-[9px] text-gray-400 font-mono mt-1 flex-wrap">
-                        <span>{t.authType} <strong className="text-gray-700 uppercase">{item.authType}</strong></span>
-                        <span>|</span>
-                        <span>{t.registeredAt} <strong className="text-gray-700">{new Date(item.registeredAt).toLocaleDateString()}</strong></span>
+
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-slate-500 uppercase tracking-wider">
+                          {item.profile ? <UserCheck size={12} /> : <User size={12} />}
+                          {item.profile ? (language === 'es' ? 'Perfil' : 'Profile') : (language === 'es' ? 'Pendiente' : 'Pending')}
+                        </div>
+                        <div className="w-8 h-8 rounded-full glass-surface-soft flex items-center justify-center text-slate-500">
+                          <Clock size={14} />
+                        </div>
                       </div>
                     </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="glass-surface rounded-[28px] p-6 sticky top-6 space-y-5" id="user-detail-panel">
+            {selectedUser ? (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-slate-400 block mb-1">
+                      {language === 'es' ? 'Detalle del usuario' : 'User detail'}
+                    </span>
+                    <h3 className="text-lg font-bold text-slate-950 font-sans truncate">
+                      {selectedUser.username}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      {selectedUser.profile
+                        ? (language === 'es' ? 'Perfil profesional listo para revisión y acción.' : 'Professional profile ready for review and action.')
+                        : (language === 'es' ? 'Aún no completó el perfil profesional.' : 'Professional profile has not been completed yet.')}
+                    </p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider font-bold border ${
+                    selectedUser.status === 'pending'
+                      ? 'bg-amber-50 text-amber-700 border-amber-100'
+                      : selectedUser.status === 'approved'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                        : 'bg-red-50 text-red-700 border-red-100'
+                  }`}>
+                    {selectedUser.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="glass-surface-soft rounded-[20px] p-3 space-y-1">
+                    <span className="text-[9px] uppercase tracking-wider font-mono text-slate-400 block">{t.authType}</span>
+                    <p className="font-semibold text-slate-950 uppercase">{selectedUser.authType}</p>
+                  </div>
+                  <div className="glass-surface-soft rounded-[20px] p-3 space-y-1">
+                    <span className="text-[9px] uppercase tracking-wider font-mono text-slate-400 block">{t.registeredAt}</span>
+                    <p className="font-semibold text-slate-950">{new Date(selectedUser.registeredAt).toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <div className="glass-surface-soft rounded-[24px] p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                      {t.detailsTitle}
+                    </span>
+                    <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-slate-400">
+                      {selectedUser.profile ? (language === 'es' ? 'Completo' : 'Complete') : (language === 'es' ? 'Vacío' : 'Empty')}
+                    </span>
                   </div>
 
-                  {/* Professional profile details if present */}
-                  {hasProfile ? (
-                    <div className="bg-[#fafafa] border border-[#eaeaea] p-4 rounded-sm text-xs space-y-3 mb-4">
-                      <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider font-bold block pb-1 border-b border-gray-200/60">
-                        {t.detailsTitle}
-                      </span>
-                      
-                      <div className="grid grid-cols-2 gap-3 font-sans">
+                  {selectedUser.profile ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <span className="text-[10px] text-gray-400 block">{language === 'es' ? 'Nombre Completo' : 'Full Name'}</span>
-                          <span className="font-bold text-gray-900 text-xs">
-                            {item.profile?.nombres} {item.profile?.apellidos}
-                          </span>
+                          <span className="text-[10px] text-slate-400 block uppercase font-mono">{language === 'es' ? 'Nombre Completo' : 'Full Name'}</span>
+                          <p className="text-sm font-semibold text-slate-950 truncate">
+                            {selectedUser.profile.nombres} {selectedUser.profile.apellidos}
+                          </p>
                         </div>
                         <div>
-                          <span className="text-[10px] text-gray-400 block">{t.matricula}</span>
-                          <span className="font-mono text-emerald-700 font-semibold text-[11px] bg-emerald-50 border border-emerald-100 px-1 py-0.5 rounded-xs inline-block">
-                            {item.profile?.matricula}
-                          </span>
+                          <span className="text-[10px] text-slate-400 block uppercase font-mono">{t.matricula}</span>
+                          <p className="text-sm font-mono font-semibold text-emerald-700">
+                            {selectedUser.profile.matricula}
+                          </p>
                         </div>
                         <div>
-                          <span className="text-[10px] text-gray-400 block">{t.dni}</span>
-                          <span className="font-mono font-bold text-gray-800 text-xs">
-                            {item.profile?.dni}
-                          </span>
+                          <span className="text-[10px] text-slate-400 block uppercase font-mono">{t.dni}</span>
+                          <p className="text-sm font-mono font-semibold text-slate-800">
+                            {selectedUser.profile.dni}
+                          </p>
                         </div>
                         <div>
-                          <span className="text-[10px] text-gray-400 block">{t.jurisdiccion}</span>
-                          <span className="font-sans font-bold text-gray-800 text-xs truncate max-w-[150px] block" title={item.profile?.jurisdiccion}>
-                            {item.profile?.jurisdiccion}
-                          </span>
+                          <span className="text-[10px] text-slate-400 block uppercase font-mono">{t.jurisdiccion}</span>
+                          <p className="text-sm font-semibold text-slate-800 truncate" title={selectedUser.profile.jurisdiccion}>
+                            {selectedUser.profile.jurisdiccion}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-gray-200/40 text-[10px] text-gray-500 font-mono truncate" title={item.profile?.email}>
-                        <Mail size={10} className="inline mr-1 text-gray-400" />
-                        {item.profile?.email}
+                      <div className="flex items-start gap-2 text-xs text-slate-600 pt-2 border-t border-white/70">
+                        <Mail size={12} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                        <span className="truncate" title={selectedUser.profile.email}>{selectedUser.profile.email}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="border border-dashed border-gray-200 p-4 rounded-sm text-center py-6 text-gray-400 text-xs mb-4">
-                      {language === 'es' 
-                        ? 'Perfil profesional no rellenado todavía (esperando aprobación inicial)' 
-                        : 'Professional profile not filled yet (awaiting initial approval)'}
+                    <div className="rounded-[18px] border border-dashed border-white/80 p-4 text-slate-500 text-sm leading-relaxed">
+                      {language === 'es'
+                        ? 'Este usuario todavía no completó su perfil profesional. Puede actuar sobre su acceso desde aquí.'
+                        : 'This user has not completed their professional profile yet. You can still act on access from here.'}
                     </div>
                   )}
                 </div>
 
-                {/* Operations & actions block */}
-                <div className="pt-4 border-t border-[#eaeaea] flex items-center justify-end gap-2">
-                  {item.status === 'pending' && (
-                    <>
-                      <button
-                        onClick={() => rejectUser(item.username)}
-                        className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 text-[10px] font-sans font-bold uppercase tracking-wider rounded-sm cursor-pointer transition-colors flex items-center gap-1"
-                      >
-                        <X size={12} />
-                        {t.rejectBtn}
-                      </button>
-                      
-                      <button
-                        onClick={() => approveUser(item.username)}
-                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-sans font-bold uppercase tracking-wider rounded-sm cursor-pointer transition-colors flex items-center gap-1 shadow-xs"
-                      >
-                        <Check size={12} />
-                        {t.approveBtn}
-                      </button>
-                    </>
-                  )}
+                <div className="glass-surface-soft rounded-[24px] p-4 space-y-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                    {language === 'es' ? 'Acciones' : 'Actions'}
+                  </span>
 
-                  {item.status === 'approved' && (
-                    <button
-                      onClick={() => rejectUser(item.username)}
-                      className="px-3 py-1.5 border border-red-100 text-red-600 hover:bg-red-50 text-[10px] font-sans font-bold uppercase tracking-wider rounded-sm cursor-pointer transition-colors flex items-center gap-1"
-                    >
-                      <UserX size={12} />
-                      {t.revokeBtn}
-                    </button>
-                  )}
+                  <div className="flex flex-col gap-2">
+                    {selectedUser.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => rejectUser(selectedUser.username)}
+                          className="w-full glass-button-secondary justify-center px-4 py-3 text-[10px] font-sans font-bold uppercase tracking-wider text-red-700 border-red-100 rounded-[18px]"
+                        >
+                          <X size={12} />
+                          {t.rejectBtn}
+                        </button>
+                        <button
+                          onClick={() => approveUser(selectedUser.username)}
+                          className="w-full glass-button-primary justify-center px-4 py-3 text-[10px] font-sans font-bold uppercase tracking-wider rounded-[18px]"
+                        >
+                          <Check size={12} />
+                          {t.approveBtn}
+                        </button>
+                      </>
+                    )}
 
-                  {item.status === 'rejected' && (
-                    <button
-                      onClick={() => approveUser(item.username)}
-                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-sans font-bold uppercase tracking-wider rounded-sm cursor-pointer transition-colors flex items-center gap-1"
-                    >
-                      <UserCheck size={12} />
-                      {t.reapproveBtn}
-                    </button>
-                  )}
+                    {selectedUser.status === 'approved' && (
+                      <button
+                        onClick={() => rejectUser(selectedUser.username)}
+                        className="w-full glass-button-secondary justify-center px-4 py-3 text-[10px] font-sans font-bold uppercase tracking-wider text-red-700 border-red-100 rounded-[18px]"
+                      >
+                        <UserX size={12} />
+                        {t.revokeBtn}
+                      </button>
+                    )}
+
+                    {selectedUser.status === 'rejected' && (
+                      <button
+                        onClick={() => approveUser(selectedUser.username)}
+                        className="w-full glass-button-primary justify-center px-4 py-3 text-[10px] font-sans font-bold uppercase tracking-wider rounded-[18px]"
+                      >
+                        <UserCheck size={12} />
+                        {t.reapproveBtn}
+                      </button>
+                    )}
+                  </div>
                 </div>
-
+              </>
+            ) : (
+              <div className="h-full min-h-[320px] flex flex-col items-center justify-center text-center space-y-3 text-slate-500">
+                <div className="w-12 h-12 rounded-full glass-surface-soft flex items-center justify-center text-slate-400">
+                  <ShieldAlert size={22} />
+                </div>
+                <div className="space-y-1 max-w-sm">
+                  <h3 className="text-sm font-bold text-slate-950 uppercase tracking-wider">
+                    {language === 'es' ? 'Sin selección' : 'No user selected'}
+                  </h3>
+                  <p className="text-xs leading-relaxed">
+                    {language === 'es'
+                      ? 'Seleccione un usuario de la lista para revisar su perfil y ejecutar acciones de gobernanza.'
+                      : 'Select a user from the list to review their profile and execute governance actions.'}
+                  </p>
+                </div>
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
       )}
 

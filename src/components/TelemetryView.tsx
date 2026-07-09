@@ -85,7 +85,7 @@ export const TelemetryView: React.FC = () => {
         </div>
 
         {/* SVG Trap Graphics */}
-        <div className="relative py-10 bg-[#09090b] rounded-sm border border-[#27272a]/50 flex items-center justify-center overflow-x-auto min-h-[220px]">
+        <div className="relative py-10 bg-[#09090b] rounded-sm border border-[#27272a]/50 flex items-center justify-center overflow-x-auto hide-scrollbar min-h-[220px]">
           {/* Background grid */}
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#27272a_1px,transparent_1px),linear-gradient(to_bottom,#27272a_1px,transparent_1px)] bg-[size:24px_24px] opacity-10" />
 

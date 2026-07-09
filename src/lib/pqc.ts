@@ -31,6 +31,50 @@ export function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
+export function bytesToBase64(bytes: Uint8Array): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const blob = new Blob([bytes], { type: 'application/octet-stream' });
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== 'string') {
+          reject(new Error('No se pudo convertir el payload cifrado a base64.'));
+          return;
+        }
+
+        const commaIndex = reader.result.indexOf(',');
+        if (commaIndex === -1) {
+          reject(new Error('Data URL inválida al serializar payload cifrado.'));
+          return;
+        }
+
+        resolve(reader.result.slice(commaIndex + 1));
+      };
+      reader.onerror = () => reject(reader.error || new Error('Fallo al serializar payload cifrado a base64.'));
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+export function base64ToBytes(base64: string): Uint8Array {
+  const normalized = base64.startsWith('b64:') ? base64.slice(4) : base64;
+  const binary = atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export function decodeEncryptedPayload(payload: string): Uint8Array {
+  if (payload.startsWith('b64:')) {
+    return base64ToBytes(payload);
+  }
+  return hexToBytes(payload);
+}
+
 // Seedable PRNG (Mulberry32) for deterministic, reproducible generation from quantum entropy
 export function createPRNG(seedHex: string): () => number {
   // Hash the seed first to ensure high distribution
@@ -259,7 +303,7 @@ export function encapsulateMLKEM(keypair: KyberKeyPair, seed: string): KyberEnca
 
 // AES-256-GCM Authentic encryption of payload using Kyber-negotiated shared secret
 export async function sealPayload(
-  message: string,
+  message: string | Uint8Array,
   filename: string | undefined,
   quantumSeed: string,
   jobId: string,
@@ -286,8 +330,9 @@ export async function sealPayload(
   
   // 4. Encrypt the plaintext message
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  const textEncoder = new TextEncoder();
-  const plaintextBytes = textEncoder.encode(message);
+  const plaintextBytes = typeof message === 'string'
+    ? new TextEncoder().encode(message)
+    : message;
   
   const encryptedBuffer = await window.crypto.subtle.encrypt(
     {
@@ -299,23 +344,9 @@ export async function sealPayload(
   );
   
   const encryptedBytes = new Uint8Array(encryptedBuffer);
-  const encryptedHex = bytesToHex(encryptedBytes);
+  const encryptedBase64 = `b64:${await bytesToBase64(encryptedBytes)}`;
   const ivHex = bytesToHex(iv);
-  let hashInput: string | Uint8Array = message;
-  if (message.startsWith('data:')) {
-    try {
-      const parts = message.split(',');
-      const base64Str = parts[1];
-      const byteCharacters = atob(base64Str);
-      const originalBytes = new Uint8Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        originalBytes[i] = byteCharacters.charCodeAt(i);
-      }
-      hashInput = originalBytes;
-    } catch (e) {
-      console.error('Failed to parse data URI in sealPayload, using raw string', e);
-    }
-  }
+  const hashInput: string | Uint8Array = message;
   const sha3OfMsg = sha3_256(hashInput);
   
   // 5. Structure the complete Sealed Manifest
@@ -349,7 +380,7 @@ export async function sealPayload(
       originalFilename: filename,
       sha3Hash: sha3OfMsg,
       iv: ivHex,
-      encryptedData: encryptedHex,
+      encryptedData: encryptedBase64,
     },
   };
   
@@ -370,7 +401,7 @@ export async function unsealPayload(manifest: SealingManifest): Promise<string> 
     );
     
     const ivBytes = hexToBytes(manifest.payload.iv);
-    const encryptedBytes = hexToBytes(manifest.payload.encryptedData);
+    const encryptedBytes = decodeEncryptedPayload(manifest.payload.encryptedData);
     
     const decryptedBuffer = await window.crypto.subtle.decrypt(
       {
