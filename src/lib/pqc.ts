@@ -412,7 +412,30 @@ export async function unsealPayload(manifest: SealingManifest): Promise<string> 
       encryptedBytes
     );
     
-    return new TextDecoder().decode(decryptedBuffer);
+    const origFilename = manifest.payload.originalFilename || '';
+    const ext = origFilename.includes('.') ? origFilename.substring(origFilename.lastIndexOf('.')).toLowerCase().trim() : '.txt';
+    const textExtensions = new Set(['.txt', '.csv', '.json', '.md', '.html', '.htm', '.js', '.ts', '.tsx', '.css']);
+    
+    if (textExtensions.has(ext)) {
+      return new TextDecoder().decode(decryptedBuffer);
+    } else {
+      let mimeType = 'application/octet-stream';
+      if (ext === '.pdf') mimeType = 'application/pdf';
+      else if (ext === '.png') mimeType = 'image/png';
+      else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+      else if (ext === '.gif') mimeType = 'image/gif';
+      else if (ext === '.webp') mimeType = 'image/webp';
+      else if (ext === '.svg') mimeType = 'image/svg+xml';
+      
+      // Convert binary decryptedBuffer to base64 Data URL
+      const bytes = new Uint8Array(decryptedBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = window.btoa(binary);
+      return `data:${mimeType};base64,${base64}`;
+    }
   } catch (error) {
     console.error('Failed to decrypt sealed payload', error);
     throw new Error('Autenticación fallida o llave de descapsulado alterada. Integridad del NIST ML-KEM comprometida.');
